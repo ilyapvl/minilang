@@ -1,0 +1,44 @@
+Program ::= { Declaration | Statement }
+
+Declaration ::= Type IDENTIFIER ["=" Expression ] ";"
+
+Type ::= "int" | "bool"
+
+Statement ::= CompoundStmt
+            | IfStmt
+            | WhileStmt
+            | AssignmentStmt
+            | Declaration 
+            | ";"  
+
+
+CompoundStmt ::= "{" { Statement } "}"
+
+IfStmt ::= "if" "(" Expression ")" Statement [ "else" Statement]
+
+WhileStmt ::= "while" "(" Expression ")" Statement
+
+AssignmentStmt ::= IDENTIFIER "=" Expression ";"
+
+Expression ::= LogicalOrExpr
+
+LogicalOrExpr ::= LogicalAndExpr { "||" LogicalAndExpr }
+
+LogicalAndExpr ::= EqualityExpr { "&&" EqualityExpr }
+
+EqualityExpr ::= RelationalExpr { ("==" | "!=") RelationalExpr }
+
+RelationalExpr ::= AdditiveExpr { ("<" | ">" | "<=" | ">=") AdditiveExpr }
+
+AdditiveExpr ::= MultiplicativeExpr { ("+" | "-") MultiplicativeExpr }
+
+MultiplicativeExpr ::= UnaryExpr { ("*" | "/" | "%") UnaryExpr }
+
+UnaryExpr ::= ("!" | "-") UnaryExpr   
+            | PrimaryExpr
+
+PrimaryExpr ::= IDENTIFIER
+              | INTEGER_LITERAL
+              | "true"
+              | "false"
+              | "(" Expression ")"
