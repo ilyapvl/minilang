@@ -5,6 +5,8 @@
 #include <fstream>
 #include <sstream>
 
+#define LALR
+
 using namespace minilang;
 
 std::string readFile(const std::string& filename)
@@ -133,8 +135,17 @@ int main(int argc, char* argv[])
     gr.buildMiniLang();
     gr.computeFirst();
     gr.computeFollow();
+    gr.prepareStatesLR1();
+
+    #ifdef LALR
+
     gr.buildLR1();
+
+    #else
+
     gr.buildLALR();
+
+    #endif
 
     Lexer lexer(source);
     std::vector<Token> tokens = lexer.tokenize();
