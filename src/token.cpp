@@ -1,55 +1,61 @@
 #include "token.hpp"
 #include <iostream>
+#include <string>
 
 namespace minilang
 {
 
-Token::Token() : type(TokenType::ERROR), line(0), column(0), intValue(0) {}
+    using namespace grammar;
 
-void printToken(const Token& tok)
-{
-    std::cout << "[" << tok.line << ":" << tok.column << "] ";
-    switch (tok.type)
+    Token::Token()
+        : type(TERM_ERROR), line(0), column(0), intValue(0) {}
+
+    static std::string termToString(Term t)
     {
-        case TokenType::INT:            std::cout << "INT        "; break;
-        case TokenType::BOOL:           std::cout << "BOOL       "; break;
-        case TokenType::IF:             std::cout << "IF         "; break;
-        case TokenType::ELSE:           std::cout << "ELSE       "; break;
-        case TokenType::WHILE:          std::cout << "WHILE      "; break;
-        case TokenType::TRUE:           std::cout << "TRUE       "; break;
-        case TokenType::FALSE:          std::cout << "FALSE      "; break;
-        case TokenType::IDENTIFIER:     std::cout << "IDENTIFIER "; break;
-        case TokenType::INTEGER:        std::cout << "INTEGER    "; break;
-        case TokenType::PLUS:           std::cout << "PLUS       "; break;
-        case TokenType::MINUS:          std::cout << "MINUS      "; break;
-        case TokenType::STAR:           std::cout << "STAR       "; break;
-        case TokenType::SLASH:          std::cout << "SLASH      "; break;
-        case TokenType::PERCENT:        std::cout << "PERCENT    "; break;
-        case TokenType::ASSIGN:         std::cout << "ASSIGN     "; break;
-        case TokenType::EQ:             std::cout << "EQ         "; break;
-        case TokenType::NE:             std::cout << "NE         "; break;
-        case TokenType::LT:             std::cout << "LT         "; break;
-        case TokenType::GT:             std::cout << "GT         "; break;
-        case TokenType::LE:             std::cout << "LE         "; break;
-        case TokenType::GE:             std::cout << "GE         "; break;
-        case TokenType::AND:            std::cout << "AND        "; break;
-        case TokenType::OR:             std::cout << "OR         "; break;
-        case TokenType::NOT:            std::cout << "NOT        "; break;
-        case TokenType::SEMICOLON:      std::cout << "SEMICOLON  "; break;
-        case TokenType::LBRACE:         std::cout << "LBRACE     "; break;
-        case TokenType::RBRACE:         std::cout << "RBRACE     "; break;
-        case TokenType::LPAREN:         std::cout << "LPAREN     "; break;
-        case TokenType::RPAREN:         std::cout << "RPAREN     "; break;
-        case TokenType::END_OF_FILE:    std::cout << "EOF        "; break;
-        case TokenType::ERROR:          std::cout << "ERROR      "; break;
+        switch (t)
+        {
+            case TERM_EOF:          return "EOF";
+            case TERM_INT:          return "int";
+            case TERM_BOOL:         return "bool";
+            case TERM_IF:           return "if";
+            case TERM_ELSE:         return "else";
+            case TERM_WHILE:        return "while";
+            case TERM_TRUE:         return "true";
+            case TERM_FALSE:        return "false";
+            case TERM_IDENTIFIER:   return "identifier";
+            case TERM_INTEGER:      return "integer";
+            case TERM_PLUS:         return "+";
+            case TERM_MINUS:        return "-";
+            case TERM_STAR:         return "*";
+            case TERM_SLASH:        return "/";
+            case TERM_PERCENT:      return "%";
+            case TERM_ASSIGN:       return "=";
+            case TERM_EQ:           return "==";
+            case TERM_NE:           return "!=";
+            case TERM_LT:           return "<";
+            case TERM_GT:           return ">";
+            case TERM_LE:           return "<=";
+            case TERM_GE:           return ">=";
+            case TERM_AND:          return "&&";
+            case TERM_OR:           return "||";
+            case TERM_NOT:          return "!";
+            case TERM_SEMICOLON:    return ";";
+            case TERM_LBRACE:       return "{";
+            case TERM_RBRACE:       return "}";
+            case TERM_LPAREN:       return "(";
+            case TERM_RPAREN:       return ")";
+            case TERM_ERROR:        return "error";
+            default:                return "unknown";
+        }
     }
-    std::cout << " '" << tok.lexeme << "'";
 
-    if (tok.type == TokenType::INTEGER) std::cout << " value=" << tok.intValue;
-
-    if (tok.type == TokenType::IDENTIFIER) std::cout << " name=" << tok.identifier;
-
-    std::cout << std::endl;
-}
+    void printToken(const Token& tok)
+    {
+        std::cout << "[" << tok.line << ":" << tok.column << "] "
+                << termToString(tok.type) << " '" << tok.lexeme << "'";
+        if (tok.type == TERM_INTEGER) std::cout << " value=" << tok.intValue;
+        if (tok.type == TERM_IDENTIFIER) std::cout << " name=" << tok.identifier;
+        std::cout << std::endl;
+    }
 
 } // namespace minilang
