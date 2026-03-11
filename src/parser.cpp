@@ -54,7 +54,15 @@ namespace minilang
 
     std::unique_ptr<Node> Parser::createNodeFromProduction(int prod_id, std::vector<std::unique_ptr<Node>> children)
     {
-        Position pos;
+        // get position from first non‑null child
+        auto getFirstPos = [&]() -> Position
+        {
+            for (const auto& child : children)
+            {
+                if (child) return child->pos;
+            }
+            return Position(0, 0);
+        };
 
         switch (prod_id) {
             // Start -> Program
@@ -66,10 +74,11 @@ namespace minilang
             {
                 auto list = cast_node<DeclOrStmtList>(children[0]);
                 if (!list) return nullptr;
+
                 return std::make_unique<Program>(
                     std::move(list->declarations),
                     std::move(list->statements),
-                    pos
+                    list->pos
                 );
             }
 
@@ -78,6 +87,8 @@ namespace minilang
             {
                 std::vector<std::unique_ptr<Declaration>> declarations;
                 std::vector<std::unique_ptr<Statement>> statements;
+
+                Position pos = getFirstPos();
                 if (auto decl = cast_node<Declaration>(children[0]))
                 {
                     declarations.push_back(std::move(decl));
@@ -90,6 +101,7 @@ namespace minilang
                 {
                     return nullptr;
                 }
+
                 return std::make_unique<DeclOrStmtList>(std::move(declarations), std::move(statements), pos);
             }
 
@@ -98,9 +110,12 @@ namespace minilang
             {
                 auto list = cast_node<DeclOrStmtList>(children[0]);
                 if (!list) return nullptr;
+
+                Position pos = list->pos;
                 auto newList = std::make_unique<DeclOrStmtList>(
                     std::move(list->declarations), std::move(list->statements), pos
                 );
+
                 if (auto decl = cast_node<Declaration>(children[1]))
                 {
                     newList->declarations.push_back(std::move(decl));
@@ -113,6 +128,7 @@ namespace minilang
                 {
                     return nullptr;
                 }
+
                 return newList;
             }
 
@@ -127,46 +143,47 @@ namespace minilang
             // Declaration -> Type IDENTIFIER SEMICOLON
             case 6:
             {
-                auto var = static_cast<Variable*>(children[1].get());
-                if (!var) return nullptr;
+                auto typeNode = cast_node<TypeNode>(children[0]);
+                auto var = cast_node<Variable>(children[1]);
+                if (!typeNode || !var) return nullptr;
+
                 Declaration::Type type;
-                if (static_cast<TypeInt*>(children[0].get()))
+                if (dynamic_cast<TypeInt*>(typeNode.get()))
                     type = Declaration::Type::INT;
-                else if (static_cast<TypeBool*>(children[0].get()))
+                else if (dynamic_cast<TypeBool*>(typeNode.get()))
                     type = Declaration::Type::BOOL;
                 else
                     return nullptr;
-                auto decl = std::make_unique<Declaration>(type, var->name, nullptr, pos);
-                return decl;
+
+                return std::make_unique<Declaration>(type, var->name, nullptr, var->pos);
             }
 
             // Declaration -> Type IDENTIFIER ASSIGN Expression SEMICOLON
             case 7:
             {
-                auto var = static_cast<Variable*>(children[1].get());
-                if (!var) return nullptr;
+                auto typeNode = cast_node<TypeNode>(children[0]);
+                auto var = cast_node<Variable>(children[1]);
+                auto expr = cast_node<Expression>(children[3]);
+                if (!typeNode || !var || !expr) return nullptr;
+
                 Declaration::Type type;
-                if (static_cast<TypeInt*>(children[0].get()))
+                if (dynamic_cast<TypeInt*>(typeNode.get()))
                     type = Declaration::Type::INT;
-                else if (static_cast<TypeBool*>(children[0].get()))
+                else if (dynamic_cast<TypeBool*>(typeNode.get()))
                     type = Declaration::Type::BOOL;
                 else
                     return nullptr;
 
-                auto expr = cast_node<Expression>(children[3]);
-                if (!expr) return nullptr;
-
-                auto decl = std::make_unique<Declaration>(type, var->name, std::move(expr), pos);
-                return decl;
+                return std::make_unique<Declaration>(type, var->name, std::move(expr), var->pos);
             }
 
             // Type -> INT
             case 8:
-                return std::make_unique<TypeInt>(pos);
+                return std::make_unique<TypeInt>(getFirstPos());
 
             // Type -> BOOL
             case 9:
-                return std::make_unique<TypeBool>(pos);
+                return std::make_unique<TypeBool>(getFirstPos());
 
             // Statement -> AssignmentStmt
             case 10:
@@ -187,12 +204,11 @@ namespace minilang
             // AssignmentStmt -> IDENTIFIER ASSIGN Expression SEMICOLON
             case 14:
             {
-                auto var = static_cast<Variable*>(children[0].get());
-                if (!var) return nullptr;
+                auto var = cast_node<Variable>(children[0]);
                 auto expr = cast_node<Expression>(children[2]);
-                if (!expr) return nullptr;
-                auto assign = std::make_unique<Assignment>(var->name, std::move(expr), pos);
-                return assign;
+
+                if (!var || !expr) return nullptr;
+                return std::make_unique<Assignment>(var->name, std::move(expr), var->pos);
             }
 
             // IfStmt -> IF LPAREN Expression RPAREN Statement
@@ -201,8 +217,9 @@ namespace minilang
                 auto cond = cast_node<Expression>(children[2]);
                 auto thenStmt = cast_node<Statement>(children[4]);
                 if (!cond || !thenStmt) return nullptr;
-                auto ifStmt = std::make_unique<IfStmt>(std::move(cond), std::move(thenStmt), nullptr, pos);
-                return ifStmt;
+
+                Position pos = getFirstPos();
+                return std::make_unique<IfStmt>(std::move(cond), std::move(thenStmt), nullptr, pos);
             }
 
             // IfStmt -> IF LPAREN Expression RPAREN Statement ELSE Statement
@@ -212,8 +229,9 @@ namespace minilang
                 auto thenStmt = cast_node<Statement>(children[4]);
                 auto elseStmt = cast_node<Statement>(children[6]);
                 if (!cond || !thenStmt || !elseStmt) return nullptr;
-                auto ifStmt = std::make_unique<IfStmt>(std::move(cond), std::move(thenStmt), std::move(elseStmt), pos);
-                return ifStmt;
+
+                Position pos = getFirstPos();
+                return std::make_unique<IfStmt>(std::move(cond), std::move(thenStmt), std::move(elseStmt), pos);
             }
 
             // WhileStmt -> WHILE LPAREN Expression RPAREN Statement
@@ -222,8 +240,9 @@ namespace minilang
                 auto cond = cast_node<Expression>(children[2]);
                 auto body = cast_node<Statement>(children[4]);
                 if (!cond || !body) return nullptr;
-                auto whileStmt = std::make_unique<WhileStmt>(std::move(cond), std::move(body), pos);
-                return whileStmt;
+
+                Position pos = getFirstPos();
+                return std::make_unique<WhileStmt>(std::move(cond), std::move(body), pos);
             }
 
             // Block -> LBRACE DeclList StmtList RBRACE
@@ -232,6 +251,8 @@ namespace minilang
                 auto declList = cast_node<DeclList>(children[1]);
                 auto stmtList = cast_node<StmtList>(children[2]);
                 if (!declList || !stmtList) return nullptr;
+                Position pos = getFirstPos();
+
                 auto block = std::make_unique<Block>(
                     std::move(declList->declarations),
                     std::move(stmtList->statements),
@@ -242,7 +263,7 @@ namespace minilang
 
             // DeclList -> ε
             case 19:
-                return std::make_unique<DeclList>(std::vector<std::unique_ptr<Declaration>>(), pos);
+                return std::make_unique<DeclList>(std::vector<std::unique_ptr<Declaration>>(), getFirstPos());
 
             // DeclList -> DeclList Declaration
             case 20:
@@ -250,14 +271,15 @@ namespace minilang
                 auto list = cast_node<DeclList>(children[0]);
                 auto decl = cast_node<Declaration>(children[1]);
                 if (!list || !decl) return nullptr;
-                auto newList = std::make_unique<DeclList>(std::move(list->declarations), pos);
+
+                auto newList = std::make_unique<DeclList>(std::move(list->declarations), list->pos);
                 newList->declarations.push_back(std::move(decl));
                 return newList;
             }
 
             // StmtList -> ε
             case 21:
-                return std::make_unique<StmtList>(std::vector<std::unique_ptr<Statement>>(), pos);
+                return std::make_unique<StmtList>(std::vector<std::unique_ptr<Statement>>(), getFirstPos());
 
             // StmtList -> StmtList Statement
             case 22:
@@ -265,7 +287,8 @@ namespace minilang
                 auto list = cast_node<StmtList>(children[0]);
                 auto stmt = cast_node<Statement>(children[1]);
                 if (!list || !stmt) return nullptr;
-                auto newList = std::make_unique<StmtList>(std::move(list->statements), pos);
+
+                auto newList = std::make_unique<StmtList>(std::move(list->statements), list->pos);
                 newList->statements.push_back(std::move(stmt));
                 return newList;
             }
@@ -284,6 +307,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::OR, std::move(left), std::move(right), pos);
             }
 
@@ -297,6 +322,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::AND, std::move(left), std::move(right), pos);
             }
 
@@ -310,6 +337,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::EQ, std::move(left), std::move(right), pos);
             }
 
@@ -319,6 +348,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::NE, std::move(left), std::move(right), pos);
             }
 
@@ -332,6 +363,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::LT, std::move(left), std::move(right), pos);
             }
 
@@ -341,6 +374,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::GT, std::move(left), std::move(right), pos);
             }
 
@@ -350,6 +385,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::LE, std::move(left), std::move(right), pos);
             }
 
@@ -359,6 +396,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::GE, std::move(left), std::move(right), pos);
             }
 
@@ -372,6 +411,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::PLUS, std::move(left), std::move(right), pos);
             }
 
@@ -381,6 +422,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::MINUS, std::move(left), std::move(right), pos);
             }
 
@@ -394,6 +437,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::MUL, std::move(left), std::move(right), pos);
             }
 
@@ -403,6 +448,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::DIV, std::move(left), std::move(right), pos);
             }
 
@@ -412,6 +459,8 @@ namespace minilang
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
+
+                Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::MOD, std::move(left), std::move(right), pos);
             }
 
@@ -424,6 +473,8 @@ namespace minilang
             {
                 auto operand = cast_node<Expression>(children[1]);
                 if (!operand) return nullptr;
+
+                Position pos = getFirstPos();
                 return std::make_unique<UnaryOperation>(UnaryOperation::Op::NOT, std::move(operand), pos);
             }
 
@@ -432,6 +483,8 @@ namespace minilang
             {
                 auto operand = cast_node<Expression>(children[1]);
                 if (!operand) return nullptr;
+
+                Position pos = getFirstPos();
                 return std::make_unique<UnaryOperation>(UnaryOperation::Op::NEG, std::move(operand), pos);
             }
 
@@ -519,6 +572,7 @@ namespace minilang
                         termNode = std::make_unique<BooleanLiteral>(false,
                             Position(m_currentToken.line, m_currentToken.column));
                     }
+                    // for other terminals termNode is nullptr
 
                     m_stack.push({nextState, std::move(termNode)});
                     nextToken();

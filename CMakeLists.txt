@@ -16,6 +16,8 @@ add_executable(test_grammar
     src/parser.cpp
     src/lexer.cpp
     src/token.cpp
+    src/symbol.cpp
+    src/semantic.cpp
 )
 
 target_include_directories(test_grammar PRIVATE include)

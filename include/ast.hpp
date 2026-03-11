@@ -8,11 +8,53 @@
 namespace minilang
 {
 
+    enum class Type { INT, BOOL, ERROR };
+
     struct Position
     {
         int line;
         int column;
         Position(int l = 0, int c = 0) : line(l), column(c) {}
+    };
+
+
+    class Program;
+    class Declaration;
+    class Assignment;
+    class IfStmt;
+    class WhileStmt;
+    class Block;
+    class BinaryOperation;
+    class UnaryOperation;
+    class IntegerLiteral;
+    class BooleanLiteral;
+    class Variable;
+    class TypeInt;
+    class TypeBool;
+    class DeclList;
+    class StmtList;
+    class DeclOrStmtList;
+
+    class Visitor
+    {
+    public:
+        virtual ~Visitor() = default;
+        virtual void visit(Program& node) = 0;
+        virtual void visit(Declaration& node) = 0;
+        virtual void visit(Assignment& node) = 0;
+        virtual void visit(IfStmt& node) = 0;
+        virtual void visit(WhileStmt& node) = 0;
+        virtual void visit(Block& node) = 0;
+        virtual void visit(BinaryOperation& node) = 0;
+        virtual void visit(UnaryOperation& node) = 0;
+        virtual void visit(IntegerLiteral& node) = 0;
+        virtual void visit(BooleanLiteral& node) = 0;
+        virtual void visit(Variable& node) = 0;
+        virtual void visit(TypeInt& node) = 0;
+        virtual void visit(TypeBool& node) = 0;
+        virtual void visit(DeclList& node) = 0;
+        virtual void visit(StmtList& node) = 0;
+        virtual void visit(DeclOrStmtList& node) = 0;
     };
 
     class Node
@@ -21,8 +63,8 @@ namespace minilang
         Position pos;
         virtual ~Node() = default;
         explicit Node(Position p) : pos(p) {}
+        virtual void accept(Visitor& v) = 0;
     };
-
 
     class TypeNode : public Node
     {
@@ -34,18 +76,20 @@ namespace minilang
     {
     public:
         TypeInt(Position p) : TypeNode(p) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class TypeBool : public TypeNode
     {
     public:
         TypeBool(Position p) : TypeNode(p) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
-
 
     class Expression : public Node
     {
     public:
+        Type exprType = Type::ERROR;
         using Node::Node;
     };
 
@@ -59,6 +103,7 @@ namespace minilang
 
         BinaryOperation(Op o, std::unique_ptr<Expression> l, std::unique_ptr<Expression> r, Position p)
             : Expression(p), op(o), left(std::move(l)), right(std::move(r)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class UnaryOperation : public Expression
@@ -70,6 +115,7 @@ namespace minilang
 
         UnaryOperation(Op o, std::unique_ptr<Expression> e, Position p)
             : Expression(p), op(o), operand(std::move(e)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class IntegerLiteral : public Expression
@@ -77,6 +123,7 @@ namespace minilang
     public:
         int value;
         IntegerLiteral(int v, Position p) : Expression(p), value(v) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class BooleanLiteral : public Expression
@@ -84,15 +131,17 @@ namespace minilang
     public:
         bool value;
         BooleanLiteral(bool v, Position p) : Expression(p), value(v) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class Variable : public Expression
     {
     public:
         std::string name;
-        Variable(std::string n, Position p) : Expression(p), name(std::move(n)) {}
-    };
 
+        Variable(std::string n, Position p) : Expression(p), name(std::move(n)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
+    };
 
     class Declaration : public Node
     {
@@ -104,8 +153,8 @@ namespace minilang
 
         Declaration(Type t, std::string n, std::unique_ptr<Expression> init, Position p)
             : Node(p), type(t), name(std::move(n)), initializer(std::move(init)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
-
 
     class Statement : public Node
     {
@@ -121,6 +170,7 @@ namespace minilang
 
         Assignment(std::string var, std::unique_ptr<Expression> e, Position p)
             : Statement(p), varName(std::move(var)), expr(std::move(e)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class IfStmt : public Statement
@@ -134,6 +184,7 @@ namespace minilang
             std::unique_ptr<Statement> elseStmt, Position p)
             : Statement(p), condition(std::move(cond)), thenBranch(std::move(thenStmt)),
             elseBranch(std::move(elseStmt)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class WhileStmt : public Statement
@@ -144,6 +195,7 @@ namespace minilang
 
         WhileStmt(std::unique_ptr<Expression> cond, std::unique_ptr<Statement> b, Position p)
             : Statement(p), condition(std::move(cond)), body(std::move(b)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class Block : public Statement
@@ -155,8 +207,8 @@ namespace minilang
         Block(std::vector<std::unique_ptr<Declaration>> decls,
             std::vector<std::unique_ptr<Statement>> stmts, Position p)
             : Statement(p), declarations(std::move(decls)), statements(std::move(stmts)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
-
 
     class DeclList : public Node
     {
@@ -164,6 +216,7 @@ namespace minilang
         std::vector<std::unique_ptr<Declaration>> declarations;
         DeclList(std::vector<std::unique_ptr<Declaration>> d, Position p)
             : Node(p), declarations(std::move(d)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class StmtList : public Node
@@ -172,6 +225,7 @@ namespace minilang
         std::vector<std::unique_ptr<Statement>> statements;
         StmtList(std::vector<std::unique_ptr<Statement>> s, Position p)
             : Node(p), statements(std::move(s)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
     class DeclOrStmtList : public Node
@@ -182,8 +236,8 @@ namespace minilang
         DeclOrStmtList(std::vector<std::unique_ptr<Declaration>> d,
                     std::vector<std::unique_ptr<Statement>> s, Position p)
             : Node(p), declarations(std::move(d)), statements(std::move(s)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
-
 
     class Program : public Node
     {
@@ -194,6 +248,7 @@ namespace minilang
         Program(std::vector<std::unique_ptr<Declaration>> decls,
                 std::vector<std::unique_ptr<Statement>> stmts, Position p)
             : Node(p), declarations(std::move(decls)), statements(std::move(stmts)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
     };
 
 } // namespace minilang
