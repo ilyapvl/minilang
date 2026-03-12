@@ -32,7 +32,7 @@ namespace minilang
         return &it->second;
     }
 
-    SymbolEntry* SymbolTable::lookupInThisTableOnly(const std::string& name)
+    SymbolEntry* SymbolTable::lookup(const std::string& name)
     {
         for (auto it = m_scopes.rbegin(); it != m_scopes.rend(); ++it)
         {
@@ -40,6 +40,8 @@ namespace minilang
             if (found != it->end())
                 return &found->second;
         }
+        if (m_parent)
+            return m_parent->lookup(name);
         return nullptr;
     }
 
@@ -47,7 +49,7 @@ namespace minilang
     {
         if (names.empty()) return nullptr;
         if (names.size() == 1)
-            return lookupInThisTableOnly(names[0]);
+            return lookup(names[0]);
 
         auto it = m_namespaces.find(names[0]);
         if (it == m_namespaces.end())

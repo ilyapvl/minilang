@@ -35,7 +35,7 @@ namespace minilang
         SymbolEntry* declare(const std::string& name, Type type, const Position& pos);
 
         // search qualified ::
-        SymbolEntry* lookupInThisTableOnly(const std::string& name);
+        SymbolEntry* lookup(const std::string& name);
         SymbolEntry* lookupQualified(const std::vector<std::string>& names);
 
 

@@ -275,7 +275,7 @@ namespace minilang
 
     void SemanticAnalyzer::visit(Variable& node)
     {
-        SymbolEntry* entry = m_currentTable->lookupInThisTableOnly(node.name);
+        SymbolEntry* entry = m_currentTable->lookup(node.name);
         if (!entry)
         {
             error(node.pos, "Undeclared variable '" + node.name + "'");
