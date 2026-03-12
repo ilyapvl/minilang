@@ -10,6 +10,8 @@ namespace minilang
 
     enum class Type { INT, BOOL, ERROR };
 
+    struct SymbolEntry;
+
     struct Position
     {
         int line;
@@ -142,6 +144,7 @@ namespace minilang
     {
     public:
         std::string name;
+        SymbolEntry* symbol;
 
         Variable(std::string n, Position p) : Expression(p), name(std::move(n)) {}
         void accept(Visitor& v) override { v.visit(*this); }
@@ -154,6 +157,7 @@ namespace minilang
         Type type;
         std::string name;
         std::unique_ptr<Expression> initializer;
+        SymbolEntry* symbol;
 
         Declaration(Type t, std::string n, std::unique_ptr<Expression> init, Position p)
             : Node(p), type(t), name(std::move(n)), initializer(std::move(init)) {}
@@ -223,6 +227,7 @@ namespace minilang
     {
     public:
         std::vector<std::string> names;
+        SymbolEntry* symbol;
 
         QualifiedIdentifier(std::vector<std::string> n, Position p)
             : Expression(p), names(std::move(n)) {}

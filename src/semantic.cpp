@@ -52,8 +52,11 @@ namespace minilang
         }
 
         Type declType = (node.type == Declaration::Type::INT) ? Type::INT : Type::BOOL;
-        if (!m_currentTable->declare(node.name, declType, node.pos))
+        SymbolEntry* entry = m_currentTable->declare(node.name, declType, node.pos);
+        if (!entry)
             error(node.pos, "Redeclaration of variable '" + node.name + "'");
+        else
+            node.symbol = entry;
     }
 
     void SemanticAnalyzer::visit(Assignment& node)
@@ -267,6 +270,7 @@ namespace minilang
             return;
         }
         node.exprType = entry->type;
+        node.symbol = entry;
     }
 
     void SemanticAnalyzer::visit(Variable& node)
@@ -279,6 +283,7 @@ namespace minilang
             return;
         }
         node.exprType = entry->type;
+        node.symbol = entry;
     }
 
 

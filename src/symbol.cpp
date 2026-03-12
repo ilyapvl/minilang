@@ -22,14 +22,14 @@ namespace minilang
         if (m_scopes.size() > 1) m_scopes.pop_back();
     }
 
-    bool SymbolTable::declare(const std::string& name, Type type, const Position& pos)
+    SymbolEntry* SymbolTable::declare(const std::string& name, Type type, const Position& pos)
     {
         auto& current = m_scopes.back();
         if (current.find(name) != current.end())
-            return false;
+            return nullptr;
 
-        current[name] = SymbolEntry(name, type, pos);
-        return true;
+        auto it = current.emplace(name, SymbolEntry(name, type, pos)).first;
+        return &it->second;
     }
 
     SymbolEntry* SymbolTable::lookupInThisTableOnly(const std::string& name)

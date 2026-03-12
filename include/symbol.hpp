@@ -10,7 +10,7 @@
 namespace minilang
 {
 
-    struct SymbolEntry
+    struct SymbolEntry // FIXME mirroring name and type fields in AST classes
     {
         std::string name;
         Type type;
@@ -32,8 +32,7 @@ namespace minilang
         void enterScope();
         void exitScope();
 
-        // true if successful, false if redeclared in current scope
-        bool declare(const std::string& name, Type type, const Position& pos);
+        SymbolEntry* declare(const std::string& name, Type type, const Position& pos);
 
         // search qualified ::
         SymbolEntry* lookupInThisTableOnly(const std::string& name);
