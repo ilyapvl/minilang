@@ -4,6 +4,7 @@
 #include "ast.hpp"
 #include "symbol.hpp"
 #include <string>
+#include <vector>
 
 namespace minilang
 {
@@ -15,25 +16,36 @@ namespace minilang
         bool analyze(Program* root);
         bool hasError() const { return m_hasError; }
 
+        // Visitor implementation
         void visit(Program& node)           override;
+
         void visit(Declaration& node)       override;
         void visit(Assignment& node)        override;
         void visit(IfStmt& node)            override;
         void visit(WhileStmt& node)         override;
         void visit(Block& node)             override;
+
         void visit(BinaryOperation& node)   override;
         void visit(UnaryOperation& node)    override;
+
         void visit(IntegerLiteral& node)    override;
         void visit(BooleanLiteral& node)    override;
+
         void visit(Variable& node)          override;
         void visit(TypeInt& node)           override;
         void visit(TypeBool& node)          override;
+
         void visit(DeclList& node)          override;
         void visit(StmtList& node)          override;
         void visit(DeclOrStmtList& node)    override;
 
+        void visit(NamespaceDecl& node)         override;
+        void visit(QualifiedIdentifier& node)   override;
+
     private:
-        SymbolTable m_symTable;
+        SymbolTable m_globalTable;
+        SymbolTable* m_currentTable;
+        std::vector<SymbolTable*> m_tableStack;
         bool m_hasError;
 
         void error(const Position& pos, const std::string& message);

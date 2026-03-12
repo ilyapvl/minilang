@@ -34,6 +34,8 @@ namespace minilang
     class DeclList;
     class StmtList;
     class DeclOrStmtList;
+    class NamespaceDecl;
+    class QualifiedIdentifier;
 
     class Visitor
     {
@@ -55,6 +57,8 @@ namespace minilang
         virtual void visit(DeclList& node) = 0;
         virtual void visit(StmtList& node) = 0;
         virtual void visit(DeclOrStmtList& node) = 0;
+        virtual void visit(NamespaceDecl& node) = 0;
+        virtual void visit(QualifiedIdentifier& node) = 0;
     };
 
     class Node
@@ -165,11 +169,11 @@ namespace minilang
     class Assignment : public Statement
     {
     public:
-        std::string varName;
+        std::unique_ptr<QualifiedIdentifier> target;
         std::unique_ptr<Expression> expr;
 
-        Assignment(std::string var, std::unique_ptr<Expression> e, Position p)
-            : Statement(p), varName(std::move(var)), expr(std::move(e)) {}
+        Assignment(std::unique_ptr<QualifiedIdentifier> t, std::unique_ptr<Expression> e, Position p)
+            : Statement(p), target(std::move(t)), expr(std::move(e)) {}
         void accept(Visitor& v) override { v.visit(*this); }
     };
 
@@ -196,6 +200,46 @@ namespace minilang
         WhileStmt(std::unique_ptr<Expression> cond, std::unique_ptr<Statement> b, Position p)
             : Statement(p), condition(std::move(cond)), body(std::move(b)) {}
         void accept(Visitor& v) override { v.visit(*this); }
+    };
+
+    class NamespaceDecl : public Statement
+    {
+    public:
+        std::string name;
+        std::vector<std::unique_ptr<Declaration>> declarations;
+        std::vector<std::unique_ptr<Statement>> statements;
+
+        NamespaceDecl(std::string n,
+                    std::vector<std::unique_ptr<Declaration>> decls,
+                    std::vector<std::unique_ptr<Statement>> stmts,
+                    Position p)
+            : Statement(p), name(std::move(n)),
+            declarations(std::move(decls)), statements(std::move(stmts)) {}
+
+        void accept(Visitor& v) override { v.visit(*this); }
+    };
+
+    class QualifiedIdentifier : public Expression
+    {
+    public:
+        std::vector<std::string> names;
+
+        QualifiedIdentifier(std::vector<std::string> n, Position p)
+            : Expression(p), names(std::move(n)) {}
+
+        void accept(Visitor& v) override { v.visit(*this); }
+
+        
+        std::string toString() const
+        {
+            std::string result;
+            for (size_t i = 0; i < names.size(); ++i)
+            {
+                if (i > 0) result += "::";
+                result += names[i];
+            }
+            return result;
+        }
     };
 
     class Block : public Statement

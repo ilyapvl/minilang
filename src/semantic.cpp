@@ -4,8 +4,7 @@
 namespace minilang
 {
 
-    SemanticAnalyzer::SemanticAnalyzer()
-        : m_hasError(false) {}
+
 
     bool SemanticAnalyzer::analyze(Program* root)
     {
@@ -53,29 +52,39 @@ namespace minilang
         }
 
         Type declType = (node.type == Declaration::Type::INT) ? Type::INT : Type::BOOL;
-        if (!m_symTable.declare(node.name, declType, node.pos))
+        if (!m_currentTable->declare(node.name, declType, node.pos))
             error(node.pos, "Redeclaration of variable '" + node.name + "'");
     }
 
     void SemanticAnalyzer::visit(Assignment& node)
     {
-        SymbolEntry* entry = m_symTable.lookup(node.varName);
-        if (!entry)
+
+        node.target->accept(*this);
+
+        if (node.target->exprType == Type::ERROR)
         {
-            error(node.pos, "Undeclared variable '" + node.varName + "' in assignment");
             if (node.expr) node.expr->accept(*this);
             return;
         }
+
 
         node.expr->accept(*this);
         Type exprType = node.expr->exprType;
         if (exprType == Type::ERROR) return;
 
-        if (exprType != entry->type)
+
+        if (exprType != node.target->exprType)
         {
-            std::string msg = "Type mismatch in assignment: variable '" + node.varName +
-                            "' has type " + (entry->type == Type::INT ? "int" : "bool") +
-                            ", expression has type " + (exprType == Type::INT ? "int" : "bool");
+            std::string msg = "Type mismatch in assignment: variable '";
+            std::string fullName;
+            for (size_t i = 0; i < node.target->names.size(); ++i)
+            {
+                if (i > 0) fullName += "::";
+                fullName += node.target->names[i];
+            }
+            msg += fullName + "' has type " + 
+                (node.target->exprType == Type::INT ? "int" : "bool") +
+                ", expression has type " + (exprType == Type::INT ? "int" : "bool");
             error(node.pos, msg);
         }
     }
@@ -111,14 +120,14 @@ namespace minilang
 
     void SemanticAnalyzer::visit(Block& node)
     {
-        m_symTable.enterScope();
+        m_currentTable->enterScope();
 
         for (auto& decl : node.declarations)
             decl->accept(*this);
         for (auto& stmt : node.statements)
             stmt->accept(*this);
 
-        m_symTable.exitScope();
+        m_currentTable->exitScope();
     }
 
     void SemanticAnalyzer::visit(BinaryOperation& node)
@@ -223,9 +232,46 @@ namespace minilang
         node.exprType = (node.value ? Type::BOOL : Type::BOOL);
     }
 
+
+    SemanticAnalyzer::SemanticAnalyzer()
+        : m_currentTable(&m_globalTable), m_hasError(false) {}
+
+
+    void SemanticAnalyzer::visit(NamespaceDecl& node)
+    {
+        SymbolTable* nsTable = m_currentTable->getOrCreateNamespace(node.name);
+
+        m_tableStack.push_back(m_currentTable);
+        m_currentTable = nsTable;
+
+        for (auto& decl : node.declarations) decl->accept(*this);
+        for (auto& stmt : node.statements) stmt->accept(*this);
+
+        m_currentTable = m_tableStack.back();
+        m_tableStack.pop_back();
+    }
+
+    void SemanticAnalyzer::visit(QualifiedIdentifier& node)
+    {
+        SymbolEntry* entry = m_currentTable->lookupQualified(node.names);
+        if (!entry)
+        {
+            std::string fullName;
+            for (size_t i = 0; i < node.names.size(); ++i)
+            {
+                if (i > 0) fullName += "::";
+                fullName += node.names[i];
+            }
+            error(node.pos, "Undeclared identifier '" + fullName + "'");
+            node.exprType = Type::ERROR;
+            return;
+        }
+        node.exprType = entry->type;
+    }
+
     void SemanticAnalyzer::visit(Variable& node)
     {
-        SymbolEntry* entry = m_symTable.lookup(node.name);
+        SymbolEntry* entry = m_currentTable->lookupInThisTableOnly(node.name);
         if (!entry)
         {
             error(node.pos, "Undeclared variable '" + node.name + "'");

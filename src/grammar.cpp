@@ -9,10 +9,9 @@ namespace grammar
 
     Grammar::Grammar() {}
 
-    int Grammar::addProduction(Symbol lhs, std::vector<Symbol> rhs, int prec, int ass)
+    int Grammar::addProduction(ProdID id, Symbol lhs, std::vector<Symbol> rhs, int prec, int assoc)
     {
-        int id = productions.size();
-        productions.push_back({id, lhs, std::move(rhs), prec, ass});
+        productions.push_back({id, lhs, std::move(rhs), prec, assoc});
         productions_by_lhs[lhs].push_back(id);
         return id;
     }
@@ -40,158 +39,61 @@ namespace grammar
 
         // Productions
 
-        // Axiom
-        addProduction(NONTERM_START, {NONTERM_PROGRAM});
-
-        // Program -> DeclOrStmtList
-        addProduction(NONTERM_PROGRAM, {NONTERM_DECLORSTMTLIST});
-
-        // DeclOrStmtList -> DeclOrStmt
-        addProduction(NONTERM_DECLORSTMTLIST, {NONTERM_DECLORSTMT});
-
-        // DeclOrStmtList -> DeclOrStmtList DeclOrStmt
-        addProduction(NONTERM_DECLORSTMTLIST, {NONTERM_DECLORSTMTLIST, NONTERM_DECLORSTMT});
-
-        // DeclOrStmt -> Declaration
-        addProduction(NONTERM_DECLORSTMT, {NONTERM_DECLARATION});
-
-        // DeclOrStmt -> Statement
-        addProduction(NONTERM_DECLORSTMT, {NONTERM_STATEMENT});
-
-        // Declaration -> Type IDENTIFIER SEMICOLON
-        addProduction(NONTERM_DECLARATION, {NONTERM_TYPE, TERM_IDENTIFIER, TERM_SEMICOLON});
-
-        // Declaration -> Type IDENTIFIER ASSIGN Expression SEMICOLON
-        addProduction(NONTERM_DECLARATION, {NONTERM_TYPE, TERM_IDENTIFIER, TERM_ASSIGN, NONTERM_EXPRESSION, TERM_SEMICOLON});
-
-        // Type -> INT
-        addProduction(NONTERM_TYPE, {TERM_INT});
-
-        // Type -> BOOL
-        addProduction(NONTERM_TYPE, {TERM_BOOL});
-
-        // Statement -> AssignmentStmt
-        addProduction(NONTERM_STATEMENT, {NONTERM_ASSIGNMENTSTMT});
-
-        // Statement -> IfStmt
-        addProduction(NONTERM_STATEMENT, {NONTERM_IFSTMT});
-
-        // Statement -> WhileStmt
-        addProduction(NONTERM_STATEMENT, {NONTERM_WHILESTMT});
-
-        // Statement -> Block
-        addProduction(NONTERM_STATEMENT, {NONTERM_BLOCK});
-
-        // AssignmentStmt -> IDENTIFIER ASSIGN Expression SEMICOLON
-        addProduction(NONTERM_ASSIGNMENTSTMT, {TERM_IDENTIFIER, TERM_ASSIGN, NONTERM_EXPRESSION, TERM_SEMICOLON});
-
-        // IfStmt -> IF LPAREN Expression RPAREN Statement
-        addProduction(NONTERM_IFSTMT, {TERM_IF, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT});
-
-        // IfStmt -> IF LPAREN Expression RPAREN Statement ELSE Statement
-        addProduction(NONTERM_IFSTMT, {TERM_IF, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT, TERM_ELSE, NONTERM_STATEMENT});
-
-        // WhileStmt -> WHILE LPAREN Expression RPAREN Statement
-        addProduction(NONTERM_WHILESTMT, {TERM_WHILE, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT});
-
-        // Block -> LBRACE DeclList StmtList RBRACE
-        addProduction(NONTERM_BLOCK, {TERM_LBRACE, NONTERM_DECLLIST, NONTERM_STMTLIST, TERM_RBRACE});
-
-        // DeclList -> ε
-        addProduction(NONTERM_DECLLIST, {});
-
-        // DeclList -> DeclList Declaration
-        addProduction(NONTERM_DECLLIST, {NONTERM_DECLLIST, NONTERM_DECLARATION});
-
-        // StmtList -> ε
-        addProduction(NONTERM_STMTLIST, {});
-
-        // StmtList -> StmtList Statement
-        addProduction(NONTERM_STMTLIST, {NONTERM_STMTLIST, NONTERM_STATEMENT});
-
-        // Expression -> LogicalOr
-        addProduction(NONTERM_EXPRESSION, {NONTERM_LOGICALOR});
-
-        // LogicalOr -> LogicalAnd
-        addProduction(NONTERM_LOGICALOR, {NONTERM_LOGICALAND});
-
-        // LogicalOr -> LogicalOr OR LogicalAnd
-        addProduction(NONTERM_LOGICALOR, {NONTERM_LOGICALOR, TERM_OR, NONTERM_LOGICALAND}, term_precedence[TERM_OR], term_assoc[TERM_OR]);
-
-        // LogicalAnd -> Equality
-        addProduction(NONTERM_LOGICALAND, {NONTERM_EQUALITY});
-
-        // LogicalAnd -> LogicalAnd AND Equality
-        addProduction(NONTERM_LOGICALAND, {NONTERM_LOGICALAND, TERM_AND, NONTERM_EQUALITY}, term_precedence[TERM_AND], term_assoc[TERM_AND]);
-
-        // Equality -> Relational
-        addProduction(NONTERM_EQUALITY, {NONTERM_RELATIONAL});
-
-        // Equality -> Equality EQ Relational
-        addProduction(NONTERM_EQUALITY, {NONTERM_EQUALITY, TERM_EQ, NONTERM_RELATIONAL}, term_precedence[TERM_EQ], term_assoc[TERM_EQ]);
-
-        // Equality -> Equality NE Relational
-        addProduction(NONTERM_EQUALITY, {NONTERM_EQUALITY, TERM_NE, NONTERM_RELATIONAL}, term_precedence[TERM_NE], term_assoc[TERM_NE]);
-
-        // Relational -> Additive
-        addProduction(NONTERM_RELATIONAL, {NONTERM_ADDITIVE});
-
-        // Relational -> Relational LT Additive
-        addProduction(NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_LT, NONTERM_ADDITIVE}, term_precedence[TERM_LT], term_assoc[TERM_LT]);
-
-        // Relational -> Relational GT Additive
-        addProduction(NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_GT, NONTERM_ADDITIVE}, term_precedence[TERM_GT], term_assoc[TERM_GT]);
-
-        // Relational -> Relational LE Additive
-        addProduction(NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_LE, NONTERM_ADDITIVE}, term_precedence[TERM_LE], term_assoc[TERM_LE]);
-
-        // Relational -> Relational GE Additive
-        addProduction(NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_GE, NONTERM_ADDITIVE}, term_precedence[TERM_GE], term_assoc[TERM_GE]);
-
-        // Additive -> Multiplicative
-        addProduction(NONTERM_ADDITIVE, {NONTERM_MULTIPLICATIVE});
-
-        // Additive -> Additive PLUS Multiplicative
-        addProduction(NONTERM_ADDITIVE, {NONTERM_ADDITIVE, TERM_PLUS, NONTERM_MULTIPLICATIVE}, term_precedence[TERM_PLUS], term_assoc[TERM_PLUS]);
-
-        // Additive -> Additive MINUS Multiplicative
-        addProduction(NONTERM_ADDITIVE, {NONTERM_ADDITIVE, TERM_MINUS, NONTERM_MULTIPLICATIVE}, term_precedence[TERM_MINUS], term_assoc[TERM_MINUS]);
-
-        // Multiplicative -> Unary
-        addProduction(NONTERM_MULTIPLICATIVE, {NONTERM_UNARY});
-
-        // Multiplicative -> Multiplicative STAR Unary
-        addProduction(NONTERM_MULTIPLICATIVE, {NONTERM_MULTIPLICATIVE, TERM_STAR, NONTERM_UNARY}, term_precedence[TERM_STAR], term_assoc[TERM_STAR]);
-
-        // Multiplicative -> Multiplicative SLASH Unary
-        addProduction(NONTERM_MULTIPLICATIVE, {NONTERM_MULTIPLICATIVE, TERM_SLASH, NONTERM_UNARY}, term_precedence[TERM_SLASH], term_assoc[TERM_SLASH]);
-
-        // Multiplicative -> Multiplicative PERCENT Unary
-        addProduction(NONTERM_MULTIPLICATIVE, {NONTERM_MULTIPLICATIVE, TERM_PERCENT, NONTERM_UNARY}, term_precedence[TERM_PERCENT], term_assoc[TERM_PERCENT]);
-
-        // Unary -> Primary
-        addProduction(NONTERM_UNARY, {NONTERM_PRIMARY});
-
-        // Unary -> NOT Unary
-        addProduction(NONTERM_UNARY, {TERM_NOT, NONTERM_UNARY}, term_precedence[TERM_NOT], term_assoc[TERM_NOT]);
-
-        // Unary -> MINUS Unary
-        addProduction(NONTERM_UNARY, {TERM_MINUS, NONTERM_UNARY}, term_precedence[TERM_MINUS], 2);
-
-        // Primary -> INTEGER
-        addProduction(NONTERM_PRIMARY, {TERM_INTEGER});
-
-        // Primary -> TRUE
-        addProduction(NONTERM_PRIMARY, {TERM_TRUE});
-
-        // Primary -> FALSE
-        addProduction(NONTERM_PRIMARY, {TERM_FALSE});
-
-        // Primary -> IDENTIFIER
-        addProduction(NONTERM_PRIMARY, {TERM_IDENTIFIER});
-
-        // Primary -> LPAREN Expression RPAREN
-        addProduction(NONTERM_PRIMARY, {TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN});
+        addProduction(PROD_START, NONTERM_START, {NONTERM_PROGRAM});
+        addProduction(PROD_PROGRAM, NONTERM_PROGRAM, {NONTERM_DECLORSTMTLIST});
+        addProduction(PROD_DECLORSTMTLIST1, NONTERM_DECLORSTMTLIST, {NONTERM_DECLORSTMT});
+        addProduction(PROD_DECLORSTMTLIST2, NONTERM_DECLORSTMTLIST, {NONTERM_DECLORSTMTLIST, NONTERM_DECLORSTMT});
+        addProduction(PROD_DECLORSTMT1, NONTERM_DECLORSTMT, {NONTERM_DECLARATION});
+        addProduction(PROD_DECLORSTMT2, NONTERM_DECLORSTMT, {NONTERM_STATEMENT});
+        addProduction(PROD_DECLARATION1, NONTERM_DECLARATION, {NONTERM_TYPE, TERM_IDENTIFIER, TERM_SEMICOLON});
+        addProduction(PROD_DECLARATION2, NONTERM_DECLARATION, {NONTERM_TYPE, TERM_IDENTIFIER, TERM_ASSIGN, NONTERM_EXPRESSION, TERM_SEMICOLON});
+        addProduction(PROD_TYPE_INT, NONTERM_TYPE, {TERM_INT});
+        addProduction(PROD_TYPE_BOOL, NONTERM_TYPE, {TERM_BOOL});
+        addProduction(PROD_STATEMENT_ASSIGN, NONTERM_STATEMENT, {NONTERM_ASSIGNMENTSTMT});
+        addProduction(PROD_STATEMENT_IF, NONTERM_STATEMENT, {NONTERM_IFSTMT});
+        addProduction(PROD_STATEMENT_WHILE, NONTERM_STATEMENT, {NONTERM_WHILESTMT});
+        addProduction(PROD_STATEMENT_BLOCK, NONTERM_STATEMENT, {NONTERM_BLOCK});
+        addProduction(PROD_STATEMENT_NAMESPACE, NONTERM_STATEMENT, {NONTERM_NAMESPACEDECL});
+        addProduction(PROD_ASSIGNMENTSTMT, NONTERM_ASSIGNMENTSTMT, {NONTERM_QUALIFIED_IDENTIFIER, TERM_ASSIGN, NONTERM_EXPRESSION, TERM_SEMICOLON});
+        addProduction(PROD_IFSTMT1, NONTERM_IFSTMT, {TERM_IF, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT});
+        addProduction(PROD_IFSTMT2, NONTERM_IFSTMT, {TERM_IF, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT, TERM_ELSE, NONTERM_STATEMENT});
+        addProduction(PROD_WHILESTMT, NONTERM_WHILESTMT, {TERM_WHILE, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT});
+        addProduction(PROD_BLOCK, NONTERM_BLOCK, {TERM_LBRACE, NONTERM_DECLLIST, NONTERM_STMTLIST, TERM_RBRACE});
+        addProduction(PROD_DECLLIST_EMPTY, NONTERM_DECLLIST, {});
+        addProduction(PROD_DECLLIST_REC, NONTERM_DECLLIST, {NONTERM_DECLLIST, NONTERM_DECLARATION});
+        addProduction(PROD_STMTLIST_EMPTY, NONTERM_STMTLIST, {});
+        addProduction(PROD_STMTLIST_REC, NONTERM_STMTLIST, {NONTERM_STMTLIST, NONTERM_STATEMENT});
+        addProduction(PROD_EXPRESSION, NONTERM_EXPRESSION, {NONTERM_LOGICALOR});
+        addProduction(PROD_LOGICALOR1, NONTERM_LOGICALOR, {NONTERM_LOGICALAND});
+        addProduction(PROD_LOGICALOR2, NONTERM_LOGICALOR, {NONTERM_LOGICALOR, TERM_OR, NONTERM_LOGICALAND}, term_precedence[TERM_OR], term_assoc[TERM_OR]);
+        addProduction(PROD_LOGICALAND1, NONTERM_LOGICALAND, {NONTERM_EQUALITY});
+        addProduction(PROD_LOGICALAND2, NONTERM_LOGICALAND, {NONTERM_LOGICALAND, TERM_AND, NONTERM_EQUALITY}, term_precedence[TERM_AND], term_assoc[TERM_AND]);
+        addProduction(PROD_EQUALITY1, NONTERM_EQUALITY, {NONTERM_RELATIONAL});
+        addProduction(PROD_EQUALITY2, NONTERM_EQUALITY, {NONTERM_EQUALITY, TERM_EQ, NONTERM_RELATIONAL}, term_precedence[TERM_EQ], term_assoc[TERM_EQ]);
+        addProduction(PROD_EQUALITY3, NONTERM_EQUALITY, {NONTERM_EQUALITY, TERM_NE, NONTERM_RELATIONAL}, term_precedence[TERM_NE], term_assoc[TERM_NE]);
+        addProduction(PROD_RELATIONAL1, NONTERM_RELATIONAL, {NONTERM_ADDITIVE});
+        addProduction(PROD_RELATIONAL2, NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_LT, NONTERM_ADDITIVE}, term_precedence[TERM_LT], term_assoc[TERM_LT]);
+        addProduction(PROD_RELATIONAL3, NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_GT, NONTERM_ADDITIVE}, term_precedence[TERM_GT], term_assoc[TERM_GT]);
+        addProduction(PROD_RELATIONAL4, NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_LE, NONTERM_ADDITIVE}, term_precedence[TERM_LE], term_assoc[TERM_LE]);
+        addProduction(PROD_RELATIONAL5, NONTERM_RELATIONAL, {NONTERM_RELATIONAL, TERM_GE, NONTERM_ADDITIVE}, term_precedence[TERM_GE], term_assoc[TERM_GE]);
+        addProduction(PROD_ADDITIVE1, NONTERM_ADDITIVE, {NONTERM_MULTIPLICATIVE});
+        addProduction(PROD_ADDITIVE2, NONTERM_ADDITIVE, {NONTERM_ADDITIVE, TERM_PLUS, NONTERM_MULTIPLICATIVE}, term_precedence[TERM_PLUS], term_assoc[TERM_PLUS]);
+        addProduction(PROD_ADDITIVE3, NONTERM_ADDITIVE, {NONTERM_ADDITIVE, TERM_MINUS, NONTERM_MULTIPLICATIVE}, term_precedence[TERM_MINUS], term_assoc[TERM_MINUS]);
+        addProduction(PROD_MULTIPLICATIVE1, NONTERM_MULTIPLICATIVE, {NONTERM_UNARY});
+        addProduction(PROD_MULTIPLICATIVE2, NONTERM_MULTIPLICATIVE, {NONTERM_MULTIPLICATIVE, TERM_STAR, NONTERM_UNARY}, term_precedence[TERM_STAR], term_assoc[TERM_STAR]);
+        addProduction(PROD_MULTIPLICATIVE3, NONTERM_MULTIPLICATIVE, {NONTERM_MULTIPLICATIVE, TERM_SLASH, NONTERM_UNARY}, term_precedence[TERM_SLASH], term_assoc[TERM_SLASH]);
+        addProduction(PROD_MULTIPLICATIVE4, NONTERM_MULTIPLICATIVE, {NONTERM_MULTIPLICATIVE, TERM_PERCENT, NONTERM_UNARY}, term_precedence[TERM_PERCENT], term_assoc[TERM_PERCENT]);
+        addProduction(PROD_UNARY1, NONTERM_UNARY, {NONTERM_PRIMARY});
+        addProduction(PROD_UNARY2, NONTERM_UNARY, {TERM_NOT, NONTERM_UNARY}, term_precedence[TERM_NOT], term_assoc[TERM_NOT]);
+        addProduction(PROD_UNARY3, NONTERM_UNARY, {TERM_MINUS, NONTERM_UNARY}, term_precedence[TERM_MINUS], 2);
+        addProduction(PROD_PRIMARY_INT, NONTERM_PRIMARY, {TERM_INTEGER});
+        addProduction(PROD_PRIMARY_TRUE, NONTERM_PRIMARY, {TERM_TRUE});
+        addProduction(PROD_PRIMARY_FALSE, NONTERM_PRIMARY, {TERM_FALSE});
+        addProduction(PROD_PRIMARY_QUALIFIED, NONTERM_PRIMARY, {NONTERM_QUALIFIED_IDENTIFIER});
+        addProduction(PROD_PRIMARY_PAREN, NONTERM_PRIMARY, {TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN});
+        addProduction(PROD_NAMESPACEDECL, NONTERM_NAMESPACEDECL, {TERM_AT, TERM_IDENTIFIER, TERM_LBRACE, NONTERM_DECLORSTMTLIST, TERM_RBRACE});
+        addProduction(PROD_QUALIFIED_ID1, NONTERM_QUALIFIED_IDENTIFIER, {TERM_IDENTIFIER});
+        addProduction(PROD_QUALIFIED_ID2, NONTERM_QUALIFIED_IDENTIFIER, {NONTERM_QUALIFIED_IDENTIFIER, TERM_SCOPE, TERM_IDENTIFIER});
     }
 
     void Grammar::computeFirst()
@@ -472,8 +374,8 @@ namespace grammar
             const State& st = states[i];
             int state_id = i;
 
-            action_table[state_id] = std::map<Symbol, Action>();
-            goto_table[state_id] = std::map<Symbol, int>();
+            action_table[state_id] = std::unordered_map<Symbol, Action>();
+            goto_table[state_id] = std::unordered_map<Symbol, int>();
 
             for (const auto& tr : st.transitions)
             {
@@ -539,6 +441,9 @@ namespace grammar
             }
         }
     }
+
+
+
     // LALR construction
 
 
@@ -651,8 +556,8 @@ namespace grammar
         for (const auto& lalr : lalr_states)
         {
             int state_id = lalr.id;
-            action_table[state_id] = std::map<Symbol, Action>();
-            goto_table[state_id] = std::map<Symbol, int>();
+            action_table[state_id] = std::unordered_map<Symbol, Action>();
+            goto_table[state_id] = std::unordered_map<Symbol, int>();
 
 
             for (const auto& tr : lalr.transitions)
@@ -807,6 +712,8 @@ namespace grammar
                 case TERM_RBRACE:       return "}";
                 case TERM_LPAREN:       return "(";
                 case TERM_RPAREN:       return ")";
+                case TERM_AT:           return "@";
+                case TERM_SCOPE:        return "::";
                 default:                return "unknown_term";
             }
         }

@@ -16,12 +16,17 @@ namespace minilang
         Type type;
         Position declPos;
         bool initialized;
+
+        SymbolEntry() : name(""), type(Type::ERROR), declPos(), initialized(false) {}
+
+        SymbolEntry(const std::string& n, Type t, const Position& p)
+            : name(n), type(t), declPos(p), initialized(false) {}
     };
 
     class SymbolTable
     {
     public:
-        SymbolTable() = default;
+        SymbolTable(const std::string& name = "", SymbolTable* parent = nullptr);
 
         // scope management
         void enterScope();
@@ -30,19 +35,20 @@ namespace minilang
         // true if successful, false if redeclared in current scope
         bool declare(const std::string& name, Type type, const Position& pos);
 
-        // finds in current or enclosing scopes
-        SymbolEntry* lookup(const std::string& name);
-
-        // lookup only in current scope
-        SymbolEntry* lookupCurrentScope(const std::string& name);
+        // search qualified ::
+        SymbolEntry* lookupInThisTableOnly(const std::string& name);
+        SymbolEntry* lookupQualified(const std::vector<std::string>& names);
 
 
-        size_t currentScopeLevel() const { return scopes.size(); }
+        SymbolTable* getOrCreateNamespace(const std::string& name);
+
+        const std::string& getName() const { return m_name; }
 
     private:
-        // each scope is a map from name to entry
-        using Scope = std::unordered_map<std::string, SymbolEntry>;
-        std::vector<Scope> scopes;
+        std::string m_name;
+        SymbolTable* m_parent;
+        std::vector<std::unordered_map<std::string, SymbolEntry>> m_scopes;
+        std::unordered_map<std::string, std::unique_ptr<SymbolTable>> m_namespaces;        
     };
 
 } // namespace minilang

@@ -54,7 +54,6 @@ namespace minilang
 
     std::unique_ptr<Node> Parser::createNodeFromProduction(int prod_id, std::vector<std::unique_ptr<Node>> children)
     {
-        // get position from first non‑null child
         auto getFirstPos = [&]() -> Position
         {
             for (const auto& child : children)
@@ -64,17 +63,17 @@ namespace minilang
             return Position(0, 0);
         };
 
-        switch (prod_id) {
-            // Start -> Program
-            case 0:
+        switch (prod_id)
+        {
+            using namespace grammar;
+
+            case PROD_START:
                 return std::move(children[0]);
 
-            // Program -> DeclOrStmtList
-            case 1:
+            case PROD_PROGRAM:
             {
                 auto list = cast_node<DeclOrStmtList>(children[0]);
                 if (!list) return nullptr;
-
                 return std::make_unique<Program>(
                     std::move(list->declarations),
                     std::move(list->statements),
@@ -82,12 +81,10 @@ namespace minilang
                 );
             }
 
-            // DeclOrStmtList -> DeclOrStmt
-            case 2:
+            case PROD_DECLORSTMTLIST1:
             {
                 std::vector<std::unique_ptr<Declaration>> declarations;
                 std::vector<std::unique_ptr<Statement>> statements;
-
                 Position pos = getFirstPos();
                 if (auto decl = cast_node<Declaration>(children[0]))
                 {
@@ -101,21 +98,17 @@ namespace minilang
                 {
                     return nullptr;
                 }
-
                 return std::make_unique<DeclOrStmtList>(std::move(declarations), std::move(statements), pos);
             }
 
-            // DeclOrStmtList -> DeclOrStmtList DeclOrStmt
-            case 3:
+            case PROD_DECLORSTMTLIST2:
             {
                 auto list = cast_node<DeclOrStmtList>(children[0]);
                 if (!list) return nullptr;
-
                 Position pos = list->pos;
                 auto newList = std::make_unique<DeclOrStmtList>(
                     std::move(list->declarations), std::move(list->statements), pos
                 );
-
                 if (auto decl = cast_node<Declaration>(children[1]))
                 {
                     newList->declarations.push_back(std::move(decl));
@@ -128,25 +121,20 @@ namespace minilang
                 {
                     return nullptr;
                 }
-
                 return newList;
             }
 
-            // DeclOrStmt -> Declaration
-            case 4:
+            case PROD_DECLORSTMT1:
                 return std::move(children[0]);
 
-            // DeclOrStmt -> Statement
-            case 5:
+            case PROD_DECLORSTMT2:
                 return std::move(children[0]);
 
-            // Declaration -> Type IDENTIFIER SEMICOLON
-            case 6:
+            case PROD_DECLARATION1:
             {
                 auto typeNode = cast_node<TypeNode>(children[0]);
                 auto var = cast_node<Variable>(children[1]);
                 if (!typeNode || !var) return nullptr;
-
                 Declaration::Type type;
                 if (dynamic_cast<TypeInt*>(typeNode.get()))
                     type = Declaration::Type::INT;
@@ -154,18 +142,15 @@ namespace minilang
                     type = Declaration::Type::BOOL;
                 else
                     return nullptr;
-
                 return std::make_unique<Declaration>(type, var->name, nullptr, var->pos);
             }
 
-            // Declaration -> Type IDENTIFIER ASSIGN Expression SEMICOLON
-            case 7:
+            case PROD_DECLARATION2:
             {
                 auto typeNode = cast_node<TypeNode>(children[0]);
                 auto var = cast_node<Variable>(children[1]);
                 auto expr = cast_node<Expression>(children[3]);
                 if (!typeNode || !var || !expr) return nullptr;
-
                 Declaration::Type type;
                 if (dynamic_cast<TypeInt*>(typeNode.get()))
                     type = Declaration::Type::INT;
@@ -173,46 +158,40 @@ namespace minilang
                     type = Declaration::Type::BOOL;
                 else
                     return nullptr;
-
                 return std::make_unique<Declaration>(type, var->name, std::move(expr), var->pos);
             }
 
-            // Type -> INT
-            case 8:
+            case PROD_TYPE_INT:
                 return std::make_unique<TypeInt>(getFirstPos());
 
-            // Type -> BOOL
-            case 9:
+            case PROD_TYPE_BOOL:
                 return std::make_unique<TypeBool>(getFirstPos());
 
-            // Statement -> AssignmentStmt
-            case 10:
+            case PROD_STATEMENT_ASSIGN:
                 return std::move(children[0]);
 
-            // Statement -> IfStmt
-            case 11:
+            case PROD_STATEMENT_IF:
                 return std::move(children[0]);
 
-            // Statement -> WhileStmt
-            case 12:
+            case PROD_STATEMENT_WHILE:
                 return std::move(children[0]);
 
-            // Statement -> Block
-            case 13:
+            case PROD_STATEMENT_BLOCK:
                 return std::move(children[0]);
 
-            // AssignmentStmt -> IDENTIFIER ASSIGN Expression SEMICOLON
-            case 14:
+            case PROD_STATEMENT_NAMESPACE:
+                return std::move(children[0]);
+
+            case PROD_ASSIGNMENTSTMT:
             {
-                auto var = cast_node<Variable>(children[0]);
+                auto qualId = cast_node<QualifiedIdentifier>(children[0]);
                 auto expr = cast_node<Expression>(children[2]);
+                if (!qualId || !expr) return nullptr;
 
-                if (!var || !expr) return nullptr;
-                return std::make_unique<Assignment>(var->name, std::move(expr), var->pos);
+                return std::make_unique<Assignment>(std::move(qualId), std::move(expr), qualId->pos);
             }
 
-            // IfStmt -> IF LPAREN Expression RPAREN Statement
-            case 15:
+            case PROD_IFSTMT1:
             {
                 auto cond = cast_node<Expression>(children[2]);
                 auto thenStmt = cast_node<Statement>(children[4]);
@@ -222,8 +201,7 @@ namespace minilang
                 return std::make_unique<IfStmt>(std::move(cond), std::move(thenStmt), nullptr, pos);
             }
 
-            // IfStmt -> IF LPAREN Expression RPAREN Statement ELSE Statement
-            case 16:
+            case PROD_IFSTMT2:
             {
                 auto cond = cast_node<Expression>(children[2]);
                 auto thenStmt = cast_node<Statement>(children[4]);
@@ -234,8 +212,7 @@ namespace minilang
                 return std::make_unique<IfStmt>(std::move(cond), std::move(thenStmt), std::move(elseStmt), pos);
             }
 
-            // WhileStmt -> WHILE LPAREN Expression RPAREN Statement
-            case 17:
+            case PROD_WHILESTMT:
             {
                 auto cond = cast_node<Expression>(children[2]);
                 auto body = cast_node<Statement>(children[4]);
@@ -245,14 +222,13 @@ namespace minilang
                 return std::make_unique<WhileStmt>(std::move(cond), std::move(body), pos);
             }
 
-            // Block -> LBRACE DeclList StmtList RBRACE
-            case 18:
+            case PROD_BLOCK:
             {
                 auto declList = cast_node<DeclList>(children[1]);
                 auto stmtList = cast_node<StmtList>(children[2]);
                 if (!declList || !stmtList) return nullptr;
-                Position pos = getFirstPos();
 
+                Position pos = getFirstPos();
                 auto block = std::make_unique<Block>(
                     std::move(declList->declarations),
                     std::move(stmtList->statements),
@@ -261,12 +237,10 @@ namespace minilang
                 return block;
             }
 
-            // DeclList -> ε
-            case 19:
+            case PROD_DECLLIST_EMPTY:
                 return std::make_unique<DeclList>(std::vector<std::unique_ptr<Declaration>>(), getFirstPos());
 
-            // DeclList -> DeclList Declaration
-            case 20:
+            case PROD_DECLLIST_REC:
             {
                 auto list = cast_node<DeclList>(children[0]);
                 auto decl = cast_node<Declaration>(children[1]);
@@ -277,12 +251,10 @@ namespace minilang
                 return newList;
             }
 
-            // StmtList -> ε
-            case 21:
+            case PROD_STMTLIST_EMPTY:
                 return std::make_unique<StmtList>(std::vector<std::unique_ptr<Statement>>(), getFirstPos());
 
-            // StmtList -> StmtList Statement
-            case 22:
+            case PROD_STMTLIST_REC:
             {
                 auto list = cast_node<StmtList>(children[0]);
                 auto stmt = cast_node<Statement>(children[1]);
@@ -293,31 +265,26 @@ namespace minilang
                 return newList;
             }
 
-            // Expression -> LogicalOr
-            case 23:
+            case PROD_EXPRESSION:
                 return std::move(children[0]);
 
-            // LogicalOr -> LogicalAnd
-            case 24:
+            case PROD_LOGICALOR1:
                 return std::move(children[0]);
 
-            // LogicalOr -> LogicalOr OR LogicalAnd
-            case 25:
+            case PROD_LOGICALOR2:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
                 if (!left || !right) return nullptr;
-
+                
                 Position pos = left->pos;
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::OR, std::move(left), std::move(right), pos);
             }
 
-            // LogicalAnd -> Equality
-            case 26:
+            case PROD_LOGICALAND1:
                 return std::move(children[0]);
 
-            // LogicalAnd -> LogicalAnd AND Equality
-            case 27:
+            case PROD_LOGICALAND2:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -327,12 +294,10 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::AND, std::move(left), std::move(right), pos);
             }
 
-            // Equality -> Relational
-            case 28:
+            case PROD_EQUALITY1:
                 return std::move(children[0]);
 
-            // Equality -> Equality EQ Relational
-            case 29:
+            case PROD_EQUALITY2:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -342,8 +307,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::EQ, std::move(left), std::move(right), pos);
             }
 
-            // Equality -> Equality NE Relational
-            case 30:
+            case PROD_EQUALITY3:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -353,12 +317,10 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::NE, std::move(left), std::move(right), pos);
             }
 
-            // Relational -> Additive
-            case 31:
+            case PROD_RELATIONAL1:
                 return std::move(children[0]);
 
-            // Relational -> Relational LT Additive
-            case 32:
+            case PROD_RELATIONAL2:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -368,8 +330,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::LT, std::move(left), std::move(right), pos);
             }
 
-            // Relational -> Relational GT Additive
-            case 33:
+            case PROD_RELATIONAL3:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -379,8 +340,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::GT, std::move(left), std::move(right), pos);
             }
 
-            // Relational -> Relational LE Additive
-            case 34:
+            case PROD_RELATIONAL4:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -390,8 +350,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::LE, std::move(left), std::move(right), pos);
             }
 
-            // Relational -> Relational GE Additive
-            case 35:
+            case PROD_RELATIONAL5:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -401,12 +360,10 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::GE, std::move(left), std::move(right), pos);
             }
 
-            // Additive -> Multiplicative
-            case 36:
+            case PROD_ADDITIVE1:
                 return std::move(children[0]);
 
-            // Additive -> Additive PLUS Multiplicative
-            case 37:
+            case PROD_ADDITIVE2:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -416,8 +373,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::PLUS, std::move(left), std::move(right), pos);
             }
 
-            // Additive -> Additive MINUS Multiplicative
-            case 38:
+            case PROD_ADDITIVE3:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -427,12 +383,10 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::MINUS, std::move(left), std::move(right), pos);
             }
 
-            // Multiplicative -> Unary
-            case 39:
+            case PROD_MULTIPLICATIVE1:
                 return std::move(children[0]);
 
-            // Multiplicative -> Multiplicative STAR Unary
-            case 40:
+            case PROD_MULTIPLICATIVE2:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -442,8 +396,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::MUL, std::move(left), std::move(right), pos);
             }
 
-            // Multiplicative -> Multiplicative SLASH Unary
-            case 41:
+            case PROD_MULTIPLICATIVE3:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -453,8 +406,7 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::DIV, std::move(left), std::move(right), pos);
             }
 
-            // Multiplicative -> Multiplicative PERCENT Unary
-            case 42:
+            case PROD_MULTIPLICATIVE4:
             {
                 auto left = cast_node<Expression>(children[0]);
                 auto right = cast_node<Expression>(children[2]);
@@ -464,12 +416,10 @@ namespace minilang
                 return std::make_unique<BinaryOperation>(BinaryOperation::Op::MOD, std::move(left), std::move(right), pos);
             }
 
-            // Unary -> Primary
-            case 43:
+            case PROD_UNARY1:
                 return std::move(children[0]);
 
-            // Unary -> NOT Unary
-            case 44:
+            case PROD_UNARY2:
             {
                 auto operand = cast_node<Expression>(children[1]);
                 if (!operand) return nullptr;
@@ -478,8 +428,7 @@ namespace minilang
                 return std::make_unique<UnaryOperation>(UnaryOperation::Op::NOT, std::move(operand), pos);
             }
 
-            // Unary -> MINUS Unary
-            case 45:
+            case PROD_UNARY3:
             {
                 auto operand = cast_node<Expression>(children[1]);
                 if (!operand) return nullptr;
@@ -488,25 +437,54 @@ namespace minilang
                 return std::make_unique<UnaryOperation>(UnaryOperation::Op::NEG, std::move(operand), pos);
             }
 
-            // Primary -> INTEGER
-            case 46:
+            case PROD_PRIMARY_INT:
                 return std::move(children[0]);
 
-            // Primary -> TRUE
-            case 47:
+            case PROD_PRIMARY_TRUE:
                 return std::move(children[0]);
 
-            // Primary -> FALSE
-            case 48:
+            case PROD_PRIMARY_FALSE:
                 return std::move(children[0]);
 
-            // Primary -> IDENTIFIER
-            case 49:
+            case PROD_PRIMARY_QUALIFIED:
                 return std::move(children[0]);
 
-            // Primary -> LPAREN Expression RPAREN
-            case 50:
+            case PROD_PRIMARY_PAREN:
                 return std::move(children[1]);
+
+            case PROD_NAMESPACEDECL:
+            {
+                auto var = cast_node<Variable>(children[1]);
+                auto list = cast_node<DeclOrStmtList>(children[3]);
+                if (!var || !list) return nullptr;
+
+                return std::make_unique<NamespaceDecl>(
+                    var->name,
+                    std::move(list->declarations),
+                    std::move(list->statements),
+                    var->pos
+                );
+            }
+
+            case PROD_QUALIFIED_ID1:
+            {
+                auto var = cast_node<Variable>(children[0]);
+                if (!var) return nullptr;
+
+                std::vector<std::string> names = { var->name };
+                return std::make_unique<QualifiedIdentifier>(std::move(names), var->pos);
+            }
+
+            case PROD_QUALIFIED_ID2:
+            {
+                auto left = cast_node<QualifiedIdentifier>(children[0]);
+                auto right = cast_node<Variable>(children[2]);
+                if (!left || !right) return nullptr;
+
+                std::vector<std::string> names = left->names;
+                names.push_back(right->name);
+                return std::make_unique<QualifiedIdentifier>(std::move(names), left->pos);
+            }
 
             default:
                 std::cerr << "Unknown production id: " << prod_id << std::endl;
@@ -523,7 +501,6 @@ namespace minilang
         {
             int state = m_stack.top().state;
             grammar::Symbol currentSymbol = m_currentToken.type;
-            
 
             auto state_it = m_grammar.action_table.find(state);
             if (state_it == m_grammar.action_table.end())
@@ -531,9 +508,8 @@ namespace minilang
                 reportError("No actions for state " + std::to_string(state));
                 return nullptr;
             }
-            
-            auto act_it = state_it->second.find(currentSymbol);
 
+            auto act_it = state_it->second.find(currentSymbol);
 
             if (act_it == state_it->second.end())
             {
@@ -541,7 +517,6 @@ namespace minilang
                 if (!recover()) return nullptr;
             }
             m_previousToken = m_currentToken;
-
 
             const grammar::Action& act = act_it->second;
 
@@ -576,7 +551,6 @@ namespace minilang
 
                     m_stack.push({nextState, std::move(termNode)});
                     nextToken();
-
                     break;
                 }
 
@@ -594,7 +568,6 @@ namespace minilang
                             reportError("Stack underflow during reduce");
                             return nullptr;
                         }
-
                         children.push_back(std::move(m_stack.top().node));
                         m_stack.pop();
                     }
@@ -642,6 +615,7 @@ namespace minilang
                         Position(0,0)
                     );
                 }
+
                 default:
                     reportError("Error action");
                     return nullptr;

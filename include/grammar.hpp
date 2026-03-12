@@ -49,6 +49,8 @@ namespace grammar
         TERM_RBRACE,
         TERM_LPAREN,
         TERM_RPAREN,
+        TERM_AT,
+        TERM_SCOPE, 
         TERM_COUNT,
         TERM_ERROR
     };
@@ -78,8 +80,72 @@ namespace grammar
         NONTERM_MULTIPLICATIVE,
         NONTERM_UNARY,
         NONTERM_PRIMARY,
+        NONTERM_NAMESPACEDECL,
+        NONTERM_QUALIFIED_IDENTIFIER,
         NONTERM_COUNT
     };
+
+    // production IDs 
+    enum ProdID
+    {
+        PROD_START = 0,
+        PROD_PROGRAM,
+        PROD_DECLORSTMTLIST1,
+        PROD_DECLORSTMTLIST2,
+        PROD_DECLORSTMT1,
+        PROD_DECLORSTMT2,
+        PROD_DECLARATION1,
+        PROD_DECLARATION2,
+        PROD_TYPE_INT,
+        PROD_TYPE_BOOL,
+        PROD_STATEMENT_ASSIGN,
+        PROD_STATEMENT_IF,
+        PROD_STATEMENT_WHILE,
+        PROD_STATEMENT_BLOCK,
+        PROD_STATEMENT_NAMESPACE,
+        PROD_ASSIGNMENTSTMT,
+        PROD_IFSTMT1,
+        PROD_IFSTMT2,
+        PROD_WHILESTMT,
+        PROD_BLOCK,
+        PROD_DECLLIST_EMPTY,
+        PROD_DECLLIST_REC,
+        PROD_STMTLIST_EMPTY,
+        PROD_STMTLIST_REC,
+        PROD_EXPRESSION,
+        PROD_LOGICALOR1,
+        PROD_LOGICALOR2,
+        PROD_LOGICALAND1,
+        PROD_LOGICALAND2,
+        PROD_EQUALITY1,
+        PROD_EQUALITY2,
+        PROD_EQUALITY3,
+        PROD_RELATIONAL1,
+        PROD_RELATIONAL2,
+        PROD_RELATIONAL3,
+        PROD_RELATIONAL4,          
+        PROD_RELATIONAL5,
+        PROD_ADDITIVE1,
+        PROD_ADDITIVE2,
+        PROD_ADDITIVE3,
+        PROD_MULTIPLICATIVE1,
+        PROD_MULTIPLICATIVE2,
+        PROD_MULTIPLICATIVE3,
+        PROD_MULTIPLICATIVE4,
+        PROD_UNARY1,
+        PROD_UNARY2,
+        PROD_UNARY3,
+        PROD_PRIMARY_INT,
+        PROD_PRIMARY_TRUE,
+        PROD_PRIMARY_FALSE,
+        PROD_PRIMARY_QUALIFIED,
+        PROD_PRIMARY_PAREN,
+        PROD_NAMESPACEDECL,
+        PROD_QUALIFIED_ID1,
+        PROD_QUALIFIED_ID2,
+        PROD_COUNT
+    };
+
 
     // Universal symbol type
     using Symbol = uint32_t;
@@ -166,12 +232,12 @@ namespace grammar
 
         // LALR data
         std::vector<LALRState> lalr_states;
-        std::map<int, std::map<Symbol, Action>> action_table;
-        std::map<int, std::map<Symbol, int>> goto_table;
+        std::unordered_map<int, std::unordered_map<Symbol, Action>> action_table;
+        std::unordered_map<int, std::unordered_map<Symbol, int>> goto_table;
 
         
 
-        int addProduction(Symbol lhs, std::vector<Symbol> rhs, int prec = 0, int ass = 0);
+        int addProduction(ProdID id, Symbol lhs, std::vector<Symbol> rhs, int prec = 0, int assoc = 0);
         void buildMiniLang();
 
         void computeFirst();
@@ -183,7 +249,7 @@ namespace grammar
         void prepareStatesLR1();
         void buildLR1();
         void buildLALR();
-        
+
         void printLALR() const;
 
         // Debug helper functions

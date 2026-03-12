@@ -231,6 +231,20 @@ namespace minilang
             case ')':
                 advance();
                 return makeToken(TERM_RPAREN, ")");
+            case '@':
+                advance();
+                return makeToken(TERM_AT, "@");
+            case ':':
+                advance();
+                if (peek() == ':')
+                {
+                    advance();
+                    return makeToken(TERM_SCOPE, "::");
+                }
+                else
+                {
+                    return errorToken("Unexpected character ':' (maybe you meant '::')");
+                }
             default:
             {
                 std::string msg = "Unexpected character: ";
