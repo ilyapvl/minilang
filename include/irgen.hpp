@@ -1,5 +1,5 @@
-#ifndef MINILANG_CODEGEN_HPP
-#define MINILANG_CODEGEN_HPP
+#ifndef MINILANG_IRGEN_HPP
+#define MINILANG_IRGEN_HPP
 
 #include "ast.hpp"
 #include "symbol.hpp"
@@ -17,6 +17,8 @@ namespace minilang
     {
     public:
         IRGenerator(llvm::LLVMContext& context, const std::string& moduleName);
+
+        llvm::Module* getModule() { return m_module; }
 
         bool generate(Program* ast);
         void printModule();
