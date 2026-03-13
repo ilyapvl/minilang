@@ -3,6 +3,7 @@
 #include "lexer.hpp"
 #include "semantic.hpp"
 #include "irgen.hpp"
+#include "codegen.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -74,10 +75,16 @@ int main(int argc, char* argv[])
     if (!generator.generate(ast.get()))
     {
         std::cerr << "Code generation failed" << std::endl;
+        return 1;
     }
 
+    //generator.printModule();
+
+    optimizeModule(generator.getModule());
 
     generator.printModule();
+
+    generateARMCode(generator.getModule(), "output.s");
 
     return 0;
 }
