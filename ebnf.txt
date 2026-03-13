@@ -9,8 +9,8 @@ Statement ::= CompoundStmt
             | WhileStmt
             | AssignmentStmt
             | Declaration 
-            | ";"  
-
+            | NamespaceDecl
+            | ";"
 
 CompoundStmt ::= "{" { Statement } "}"
 
@@ -18,7 +18,9 @@ IfStmt ::= "if" "(" Expression ")" Statement [ "else" Statement]
 
 WhileStmt ::= "while" "(" Expression ")" Statement
 
-AssignmentStmt ::= IDENTIFIER "=" Expression ";"
+AssignmentStmt ::= QualifiedIdentifier "=" Expression ";"
+
+NamespaceDecl ::= "@" IDENTIFIER "{" { Declaration | Statement } "}"
 
 Expression ::= LogicalOrExpr
 
@@ -37,8 +39,10 @@ MultiplicativeExpr ::= UnaryExpr { ("*" | "/" | "%") UnaryExpr }
 UnaryExpr ::= ("!" | "-") UnaryExpr   
             | PrimaryExpr
 
-PrimaryExpr ::= IDENTIFIER
+PrimaryExpr ::= QualifiedIdentifier
               | INTEGER_LITERAL
               | "true"
               | "false"
               | "(" Expression ")"
+
+QualifiedIdentifier ::= IDENTIFIER { "::" IDENTIFIER }
