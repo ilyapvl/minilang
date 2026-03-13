@@ -35,7 +35,7 @@ namespace minilang
         llvm::FunctionType* mainType = llvm::FunctionType::get(
             llvm::Type::getInt32Ty(m_context), false);
         m_mainFunction = llvm::Function::Create(
-            mainType, llvm::Function::ExternalLinkage, "main", m_module);
+            mainType, llvm::Function::ExternalLinkage, "_main", m_module);
 
         llvm::BasicBlock* entry = llvm::BasicBlock::Create(m_context, "entry", m_mainFunction);
         m_builder.SetInsertPoint(entry);
@@ -64,7 +64,7 @@ namespace minilang
             std::cerr << "Function verification failed" << std::endl;
             return false;
         }
-        
+
         hasError = llvm::verifyModule(*m_module, &llvm::errs());
         if (hasError)
         {
@@ -84,13 +84,6 @@ namespace minilang
 
     void IRGenerator::visit(Program& node)
     {
-        if (m_collecting)
-        {
-            for (auto& decl : node.declarations) decl->accept(*this);
-            for (auto& stmt : node.statements) stmt->accept(*this);
-            return;
-        }
-
         for (auto& decl : node.declarations) decl->accept(*this);
         for (auto& stmt : node.statements) stmt->accept(*this);
     }
@@ -251,13 +244,6 @@ namespace minilang
 
     void IRGenerator::visit(Block& node)
     {
-        if (m_collecting)
-        {
-            for (auto& decl : node.declarations) decl->accept(*this);
-            for (auto& stmt : node.statements) stmt->accept(*this);
-            return;
-        }
-
         for (auto& decl : node.declarations) decl->accept(*this);
         for (auto& stmt : node.statements) stmt->accept(*this);
     }
@@ -431,44 +417,22 @@ namespace minilang
 
     void IRGenerator::visit(DeclList& node)
     {
-        if (m_collecting)
-        {
-            for (auto& decl : node.declarations) decl->accept(*this);
-            return;
-        }
         for (auto& decl : node.declarations) decl->accept(*this);
     }
 
     void IRGenerator::visit(StmtList& node)
     {
-        if (m_collecting)
-        {
-            for (auto& stmt : node.statements) stmt->accept(*this);
-            return;
-        }
         for (auto& stmt : node.statements) stmt->accept(*this);
     }
 
     void IRGenerator::visit(DeclOrStmtList& node)
     {
-        if (m_collecting)
-        {
-            for (auto& decl : node.declarations) decl->accept(*this);
-            for (auto& stmt : node.statements) stmt->accept(*this);
-            return;
-        }
         for (auto& decl : node.declarations) decl->accept(*this);
         for (auto& stmt : node.statements) stmt->accept(*this);
     }
 
     void IRGenerator::visit(NamespaceDecl& node)
     {
-        if (m_collecting)
-        {
-            for (auto& decl : node.declarations) decl->accept(*this);
-            for (auto& stmt : node.statements) stmt->accept(*this);
-            return;
-        }
         for (auto& decl : node.declarations) decl->accept(*this);
         for (auto& stmt : node.statements) stmt->accept(*this);
     }
