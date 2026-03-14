@@ -22,6 +22,8 @@ namespace minilang
 
     class Program;
     class Declaration;
+    class VarDecl;
+    class FuncDecl;
     class Assignment;
     class IfStmt;
     class WhileStmt;
@@ -38,29 +40,42 @@ namespace minilang
     class DeclOrStmtList;
     class NamespaceDecl;
     class QualifiedIdentifier;
+    class CallExpr;
+    class ReturnStmt;
 
     class Visitor
     {
     public:
         virtual ~Visitor() = default;
         virtual void visit(Program& node) = 0;
-        virtual void visit(Declaration& node) = 0;
         virtual void visit(Assignment& node) = 0;
+
+        virtual void visit(FuncDecl& node) = 0;
+        virtual void visit(VarDecl& node) = 0;
+
         virtual void visit(IfStmt& node) = 0;
         virtual void visit(WhileStmt& node) = 0;
         virtual void visit(Block& node) = 0;
+
         virtual void visit(BinaryOperation& node) = 0;
         virtual void visit(UnaryOperation& node) = 0;
+
         virtual void visit(IntegerLiteral& node) = 0;
         virtual void visit(BooleanLiteral& node) = 0;
         virtual void visit(Variable& node) = 0;
+
         virtual void visit(TypeInt& node) = 0;
         virtual void visit(TypeBool& node) = 0;
+
         virtual void visit(DeclList& node) = 0;
         virtual void visit(StmtList& node) = 0;
         virtual void visit(DeclOrStmtList& node) = 0;
+
         virtual void visit(NamespaceDecl& node) = 0;
         virtual void visit(QualifiedIdentifier& node) = 0;
+
+        virtual void visit(ReturnStmt& node) = 0;
+        virtual void visit(CallExpr& node) = 0;
     };
 
     class Node
@@ -153,14 +168,35 @@ namespace minilang
     class Declaration : public Node
     {
     public:
-        enum class Type { INT, BOOL };
+        using Node::Node;
+        virtual ~Declaration() = default;
+    };
+
+    class VarDecl : public Declaration
+    {
+    public:
         Type type;
         std::string name;
         std::unique_ptr<Expression> initializer;
         SymbolEntry* symbol;
 
-        Declaration(Type t, std::string n, std::unique_ptr<Expression> init, Position p)
-            : Node(p), type(t), name(std::move(n)), initializer(std::move(init)) {}
+        VarDecl(Type t, std::string n, std::unique_ptr<Expression> init, Position p)
+            : Declaration(p), type(t), name(std::move(n)), initializer(std::move(init)), symbol(nullptr) {}
+
+        void accept(Visitor& v) override { v.visit(*this); }
+    };
+
+    class FuncDecl : public Declaration
+    {
+    public:
+        std::string name;
+        Type returnType;
+        std::unique_ptr<Block> body;
+        SymbolEntry* symbol;
+
+        FuncDecl(std::string n, Type ret, std::unique_ptr<Block> b, Position p)
+            : Declaration(p), name(std::move(n)), returnType(ret), body(std::move(b)), symbol(nullptr) {}
+
         void accept(Visitor& v) override { v.visit(*this); }
     };
 
@@ -219,6 +255,17 @@ namespace minilang
                     Position p)
             : Statement(p), name(std::move(n)),
             declarations(std::move(decls)), statements(std::move(stmts)) {}
+
+        void accept(Visitor& v) override { v.visit(*this); }
+    };
+
+    class ReturnStmt : public Statement
+    {
+    public:
+        std::unique_ptr<Expression> value;
+
+        ReturnStmt(std::unique_ptr<Expression> val, Position p)
+            : Statement(p), value(std::move(val)) {}
 
         void accept(Visitor& v) override { v.visit(*this); }
     };
@@ -285,6 +332,18 @@ namespace minilang
         DeclOrStmtList(std::vector<std::unique_ptr<Declaration>> d,
                     std::vector<std::unique_ptr<Statement>> s, Position p)
             : Node(p), declarations(std::move(d)), statements(std::move(s)) {}
+        void accept(Visitor& v) override { v.visit(*this); }
+    };
+
+    class CallExpr : public Expression
+    {
+    public:
+        std::string name;
+        // std::vector<std::unique_ptr<Expression>> arguments;
+
+        CallExpr(std::string n, Position p)
+            : Expression(p), name(std::move(n)) {}
+
         void accept(Visitor& v) override { v.visit(*this); }
     };
 

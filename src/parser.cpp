@@ -135,14 +135,14 @@ namespace minilang
                 auto typeNode = cast_node<TypeNode>(children[0]);
                 auto var = cast_node<Variable>(children[1]);
                 if (!typeNode || !var) return nullptr;
-                Declaration::Type type;
+                Type type;
                 if (dynamic_cast<TypeInt*>(typeNode.get()))
-                    type = Declaration::Type::INT;
+                    type = Type::INT;
                 else if (dynamic_cast<TypeBool*>(typeNode.get()))
-                    type = Declaration::Type::BOOL;
+                    type = Type::BOOL;
                 else
                     return nullptr;
-                return std::make_unique<Declaration>(type, var->name, nullptr, var->pos);
+                return std::make_unique<VarDecl>(type, var->name, nullptr, var->pos);
             }
 
             case PROD_DECLARATION2:
@@ -151,14 +151,30 @@ namespace minilang
                 auto var = cast_node<Variable>(children[1]);
                 auto expr = cast_node<Expression>(children[3]);
                 if (!typeNode || !var || !expr) return nullptr;
-                Declaration::Type type;
+                Type type;
                 if (dynamic_cast<TypeInt*>(typeNode.get()))
-                    type = Declaration::Type::INT;
+                    type = Type::INT;
                 else if (dynamic_cast<TypeBool*>(typeNode.get()))
-                    type = Declaration::Type::BOOL;
+                    type = Type::BOOL;
                 else
                     return nullptr;
-                return std::make_unique<Declaration>(type, var->name, std::move(expr), var->pos);
+                return std::make_unique<VarDecl>(type, var->name, std::move(expr), var->pos);
+            }
+
+            case PROD_DECLARATION_FUNC:
+            {
+                auto var = cast_node<Variable>(children[1]);
+                auto typeNode = cast_node<TypeNode>(children[3]);
+                auto block = cast_node<Block>(children[4]);
+                if (!var || !typeNode || !block) return nullptr;
+                Type retType;
+                if (dynamic_cast<TypeInt*>(typeNode.get()))
+                    retType = Type::INT;
+                else if (dynamic_cast<TypeBool*>(typeNode.get()))
+                    retType = Type::BOOL;
+                else
+                    return nullptr;
+                return std::make_unique<FuncDecl>(var->name, retType, std::move(block), var->pos);
             }
 
             case PROD_TYPE_INT:
@@ -484,6 +500,23 @@ namespace minilang
                 std::vector<std::string> names = left->names;
                 names.push_back(right->name);
                 return std::make_unique<QualifiedIdentifier>(std::move(names), left->pos);
+            }
+
+            case PROD_RETURN_STMT:
+            {
+                if (children.size() < 3) return nullptr;
+                auto expr = cast_node<Expression>(children[1]);
+                if (!expr) return nullptr;
+                Position pos = getFirstPos();
+                return std::make_unique<ReturnStmt>(std::move(expr), pos);
+            }
+
+            case PROD_CALL_EXPR:
+            {
+                if (children.size() < 3) return nullptr;
+                auto var = cast_node<Variable>(children[0]);
+                if (!var) return nullptr;
+                return std::make_unique<CallExpr>(var->name, var->pos);
             }
 
             default:

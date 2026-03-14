@@ -64,6 +64,8 @@ namespace minilang
         if (lexeme == "while") return makeToken(TERM_WHILE, lexeme);
         if (lexeme == "true")  return makeToken(TERM_TRUE, lexeme);
         if (lexeme == "false") return makeToken(TERM_FALSE, lexeme);
+        if (lexeme == "func")   return makeToken(TERM_FUNC, lexeme);
+        if (lexeme == "return") return makeToken(TERM_RETURN, lexeme);
 
         Token t = makeToken(TERM_IDENTIFIER, lexeme);
         t.identifier = lexeme;
@@ -114,6 +116,11 @@ namespace minilang
                 return makeToken(TERM_PLUS, "+");
             case '-':
                 advance();
+                if (peek() == '>')
+                {
+                    advance();
+                    return makeToken(TERM_ARROW, "->");
+                }
                 return makeToken(TERM_MINUS, "-");
             case '*':
                 advance();

@@ -19,7 +19,10 @@ namespace minilang
         // Visitor implementation
         void visit(Program& node)           override;
 
-        void visit(Declaration& node)       override;
+
+        void visit(VarDecl& node)           override;
+        void visit(FuncDecl& node)          override;
+
         void visit(Assignment& node)        override;
         void visit(IfStmt& node)            override;
         void visit(WhileStmt& node)         override;
@@ -41,6 +44,10 @@ namespace minilang
 
         void visit(NamespaceDecl& node)         override;
         void visit(QualifiedIdentifier& node)   override;
+
+        void visit(CallExpr& node)              override;
+        void visit(ReturnStmt& node)            override;
+
 
     private:
         SymbolTable m_globalTable;

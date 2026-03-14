@@ -44,6 +44,11 @@ namespace minilang
             case TERM_RBRACE:       return "}";
             case TERM_LPAREN:       return "(";
             case TERM_RPAREN:       return ")";
+            case TERM_FUNC:         return "func";
+            case TERM_RETURN:       return "return";
+            case TERM_ARROW:        return "->";
+
+
             case TERM_ERROR:        return "error";
             default:                return "unknown";
         }

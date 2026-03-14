@@ -88,38 +88,26 @@ namespace minilang
         for (auto& stmt : node.statements) stmt->accept(*this);
     }
 
-    void IRGenerator::visit(Declaration& node)
+    void IRGenerator::visit(VarDecl& node)
     {
         if (m_collecting)
         {
-
             llvm::Type* llvmType = nullptr;
-            if (node.type == Declaration::Type::INT)
-            {
+            if (node.type == Type::INT)
                 llvmType = llvm::Type::getInt32Ty(m_context);
-            }
-            else if (node.type == Declaration::Type::BOOL)
-            {
+            else if (node.type == Type::BOOL)
                 llvmType = llvm::Type::getInt1Ty(m_context);
-            }
             else
             {
-                std::cerr << "Unknown declaration type" << std::endl;
+                std::cerr << "Unknown variable type" << std::endl;
                 return;
             }
 
-            
             llvm::AllocaInst* alloca = createAllocaInEntry(llvmType, node.name);
-
-
             if (node.symbol)
-            {
                 m_allocaMap[node.symbol] = alloca;
-            }
             else
-            {
-                std::cerr << "Declaration without symbol entry" << std::endl;
-            }
+                std::cerr << "VarDecl without symbol entry" << std::endl;
             return;
         }
 
@@ -132,10 +120,16 @@ namespace minilang
             {
                 auto it = m_allocaMap.find(node.symbol);
                 if (it != m_allocaMap.end())
-                {
                     m_builder.CreateStore(initVal, it->second);
-                }
             }
+        }
+    }
+
+    void IRGenerator::visit(FuncDecl& node)
+    {
+        if (m_collecting)
+        {
+            return;
         }
     }
 
@@ -435,6 +429,16 @@ namespace minilang
     {
         for (auto& decl : node.declarations) decl->accept(*this);
         for (auto& stmt : node.statements) stmt->accept(*this);
+    }
+
+    void IRGenerator::visit(CallExpr& node)
+    {
+
+    }
+
+    void IRGenerator::visit(ReturnStmt& node)
+    {
+
     }
 
 } // namespace minilang

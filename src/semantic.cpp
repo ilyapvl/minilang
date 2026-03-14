@@ -32,18 +32,17 @@ namespace minilang
             stmt->accept(*this);
     }
 
-    void SemanticAnalyzer::visit(Declaration& node)
+    void SemanticAnalyzer::visit(VarDecl& node)
     {
         if (node.initializer)
         {
             node.initializer->accept(*this);
             if (node.initializer->exprType != Type::ERROR)
             {
-                Type declType = (node.type == Declaration::Type::INT) ? Type::INT : Type::BOOL;
-                if (node.initializer->exprType != declType)
+                if (node.initializer->exprType != node.type)
                 {
                     std::string msg = "Type mismatch in initialization: expected ";
-                    msg += (declType == Type::INT ? "int" : "bool");
+                    msg += (node.type == Type::INT ? "int" : "bool");
                     msg += ", got ";
                     msg += (node.initializer->exprType == Type::INT ? "int" : "bool");
                     error(node.pos, msg);
@@ -51,12 +50,16 @@ namespace minilang
             }
         }
 
-        Type declType = (node.type == Declaration::Type::INT) ? Type::INT : Type::BOOL;
-        SymbolEntry* entry = m_currentTable->declare(node.name, declType, node.pos);
+        SymbolEntry* entry = m_currentTable->declare(node.name, node.type, node.pos);
         if (!entry)
             error(node.pos, "Redeclaration of variable '" + node.name + "'");
         else
             node.symbol = entry;
+    }
+
+    void SemanticAnalyzer::visit(FuncDecl& node)
+    {
+
     }
 
     void SemanticAnalyzer::visit(Assignment& node)
@@ -308,6 +311,16 @@ namespace minilang
             decl->accept(*this);
         for (auto& stmt : node.statements)
             stmt->accept(*this);
+    }
+
+    void SemanticAnalyzer::visit(CallExpr& node)
+    {
+
+    }
+
+    void SemanticAnalyzer::visit(ReturnStmt& node)
+    {
+
     }
 
 } // namespace minilang

@@ -50,7 +50,11 @@ namespace grammar
         TERM_LPAREN,
         TERM_RPAREN,
         TERM_AT,
-        TERM_SCOPE, 
+        TERM_SCOPE,
+        TERM_FUNC,
+        TERM_ARROW,
+        TERM_RETURN,
+
         TERM_COUNT,
         TERM_ERROR
     };
@@ -143,6 +147,11 @@ namespace grammar
         PROD_NAMESPACEDECL,
         PROD_QUALIFIED_ID1,
         PROD_QUALIFIED_ID2,
+
+        PROD_DECLARATION_FUNC,
+        PROD_RETURN_STMT,
+        PROD_CALL_EXPR,
+        
         PROD_COUNT
     };
 
