@@ -164,9 +164,11 @@ namespace minilang
             case PROD_DECLARATION_FUNC:
             {
                 auto var = cast_node<Variable>(children[1]);
-                auto typeNode = cast_node<TypeNode>(children[3]);
-                auto block = cast_node<Block>(children[4]);
-                if (!var || !typeNode || !block) return nullptr;
+                auto paramList = cast_node<ParameterList>(children[3]);
+                auto typeNode = cast_node<TypeNode>(children[6]);
+                auto block = cast_node<Block>(children[7]);
+                if (!var || !paramList || !typeNode || !block) return nullptr;
+                
                 Type retType;
                 if (dynamic_cast<TypeInt*>(typeNode.get()))
                     retType = Type::INT;
@@ -174,7 +176,9 @@ namespace minilang
                     retType = Type::BOOL;
                 else
                     return nullptr;
-                return std::make_unique<FuncDecl>(var->name, retType, std::move(block), var->pos);
+                
+                return std::make_unique<FuncDecl>(var->name, retType, std::move(paramList->parameters), 
+                                  std::move(block), var->pos);
             }
 
             case PROD_TYPE_INT:
@@ -507,27 +511,104 @@ namespace minilang
                 if (children.size() < 3) return nullptr;
                 auto expr = cast_node<Expression>(children[1]);
                 if (!expr) return nullptr;
+
                 Position pos = getFirstPos();
                 return std::make_unique<ReturnStmt>(std::move(expr), pos);
             }
 
             case PROD_CALL_EXPR:
             {
-                if (children.size() < 3) return nullptr;
                 auto qualId = cast_node<QualifiedIdentifier>(children[0]);
-                if (!qualId) return nullptr;
-                return std::make_unique<CallExpr>(std::move(qualId), qualId->pos);
+                auto argList = cast_node<ArgumentList>(children[2]);
+                if (!qualId || !argList) return nullptr;
+
+                return std::make_unique<CallExpr>(std::move(qualId), std::move(argList->arguments), qualId->pos);
             }
 
             case PROD_EXPRESSION_STMT:
             {
                 auto expr = cast_node<Expression>(children[0]);
                 if (!expr) return nullptr;
+
                 return std::make_unique<ExpressionStmt>(std::move(expr), expr->pos);
             }
 
 
+            case PROD_PARAMETER:
+            {
+                if (children.size() != 2) return nullptr;
+                if (!children[0] || !children[1]) return nullptr;
+                auto typeNode = cast_node<TypeNode>(children[0]);
+                auto var = cast_node<Variable>(children[1]);
+                if (!typeNode || !var) return nullptr;
+                Type type;
+                if (dynamic_cast<TypeInt*>(typeNode.get()))
+                    type = Type::INT;
+                else if (dynamic_cast<TypeBool*>(typeNode.get()))
+                    type = Type::BOOL;
+                else
+                    return nullptr;
 
+                return std::make_unique<VarDecl>(type, var->name, nullptr, var->pos);
+            }
+
+            case PROD_PARAMETER_LIST_EMPTY:
+            {
+                Position pos = getFirstPos();
+                return std::make_unique<ParameterList>(std::vector<std::unique_ptr<VarDecl>>(), pos);
+            }
+
+            case PROD_PARAMETER_LIST_SINGLE:
+            {
+                auto param = cast_node<VarDecl>(children[0]);
+                if (!param) return nullptr;
+
+                Position pos = param->pos;
+                std::vector<std::unique_ptr<VarDecl>> params;
+                params.push_back(std::move(param));
+                return std::make_unique<ParameterList>(std::move(params), pos);
+            }
+
+            case PROD_PARAMETER_LIST_MULTI:
+            {
+                auto list = cast_node<ParameterList>(children[0]);
+                auto param = cast_node<VarDecl>(children[2]);
+                if (!list || !param) return nullptr;
+
+                Position pos = list->pos;
+                auto newList = std::make_unique<ParameterList>(std::move(list->parameters), pos);
+                newList->parameters.push_back(std::move(param));
+                return newList;
+            }
+
+            case PROD_ARGUMENT_LIST_EMPTY:
+            {
+                Position pos = getFirstPos();
+                return std::make_unique<ArgumentList>(std::vector<std::unique_ptr<Expression>>(), pos);
+            }
+
+            case PROD_ARGUMENT_LIST_SINGLE:
+            {
+                auto expr = cast_node<Expression>(children[0]);
+                if (!expr) return nullptr;
+
+                Position pos = expr->pos;
+                std::vector<std::unique_ptr<Expression>> args;
+                args.push_back(std::move(expr));
+                return std::make_unique<ArgumentList>(std::move(args), pos);
+            }
+
+            case PROD_ARGUMENT_LIST_MULTI:
+            {
+                auto list = cast_node<ArgumentList>(children[0]);
+                auto expr = cast_node<Expression>(children[2]);
+                if (!list || !expr) return nullptr;
+
+                Position pos = list->pos;
+                auto newList = std::make_unique<ArgumentList>(std::move(list->arguments), pos);
+                newList->arguments.push_back(std::move(expr));
+                return newList;
+            }
 
 
 

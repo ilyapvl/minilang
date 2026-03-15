@@ -18,13 +18,9 @@ namespace minilang
  
     llvm::AllocaInst* IRGenerator::createAllocaInEntry(llvm::Type* type, const std::string& name)
     {
-
         llvm::IRBuilder<>::InsertPoint savedIP = m_builder.saveIP();
-
-        m_builder.SetInsertPoint(m_entryBlock);
-
+        m_builder.SetInsertPoint(m_currentEntryBlock);
         auto alloca = m_builder.CreateAlloca(type, nullptr, name);
-
         m_builder.restoreIP(savedIP);
         return alloca;
     }
@@ -105,11 +101,21 @@ namespace minilang
         {
             llvm::Type* retType = (node.returnType == Type::INT) ?
                 llvm::Type::getInt32Ty(m_context) : llvm::Type::getInt1Ty(m_context);
-            llvm::FunctionType* funcType = llvm::FunctionType::get(retType, false);
-            if (node.name == "main") node.name = "_main";
 
-            llvm::Function* func = llvm::Function::Create(
-                funcType, llvm::Function::ExternalLinkage, node.name, m_module);
+            std::vector<llvm::Type*> paramTypes;
+            for (auto& param : node.parameters)
+            {
+                if (param->type == Type::INT)
+                    paramTypes.push_back(llvm::Type::getInt32Ty(m_context));
+                else
+                    paramTypes.push_back(llvm::Type::getInt1Ty(m_context));
+            }
+
+            llvm::FunctionType* funcType = llvm::FunctionType::get(retType, paramTypes, false);
+
+            std::string funcName = (node.name == "main") ? "_main" : node.name;
+            llvm::Function* func = llvm::Function::Create(funcType, llvm::Function::ExternalLinkage, funcName, m_module);
+
             m_functionMap[node.symbol] = func;
             return;
         }
@@ -127,9 +133,20 @@ namespace minilang
         m_currentFunction = func;
         m_currentEntryBlock = entry;
 
+        auto argIt = func->arg_begin();
+        for (size_t i = 0; i < node.parameters.size(); ++i, ++argIt)
+        {
+            VarDecl* paramDecl = node.parameters[i].get();
+            argIt->setName(paramDecl->name);
 
-        if (node.body)
-            node.body->accept(*this);
+            llvm::AllocaInst* alloca = createAllocaInEntry(argIt->getType(), paramDecl->name);
+
+            m_builder.CreateStore(argIt, alloca);
+
+            m_allocaMap[paramDecl->symbol] = alloca;
+        }
+
+        if (node.body) node.body->accept(*this);
 
         if (!m_builder.GetInsertBlock()->getTerminator())
         {
@@ -443,7 +460,14 @@ namespace minilang
 
     void IRGenerator::visit(CallExpr& node)
     {
-        if (m_collecting) return;
+        if (m_collecting)
+        {
+            node.callee->accept(*this);
+            for (auto& arg : node.arguments)
+                arg->accept(*this);
+            return;
+        }
+
         auto it = m_functionMap.find(node.symbol);
         if (it == m_functionMap.end())
         {
@@ -452,7 +476,21 @@ namespace minilang
             return;
         }
         llvm::Function* callee = it->second;
-        llvm::Value* result = m_builder.CreateCall(callee, {}, node.callee->toString() + "_call");
+
+        std::vector<llvm::Value*> args;
+        for (auto& arg : node.arguments)
+        {
+            arg->accept(*this);
+            llvm::Value* argVal = popValue();
+            if (!argVal)
+            {
+                pushValue(nullptr);
+                return;
+            }
+            args.push_back(argVal);
+        }
+
+        llvm::Value* result = m_builder.CreateCall(callee, args, node.callee->toString() + "_call");
         pushValue(result);
     }
 
@@ -474,6 +512,16 @@ namespace minilang
         }
         node.expr->accept(*this);
         popValue();
+    }
+
+    void IRGenerator::visit(ParameterList& node)
+    {
+
+    }
+
+    void IRGenerator::visit(ArgumentList& node)
+    {
+
     }
 
 } // namespace minilang

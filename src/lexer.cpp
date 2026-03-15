@@ -252,6 +252,9 @@ namespace minilang
                 {
                     return errorToken("Unexpected character ':' (maybe you meant '::')");
                 }
+            case ',':
+                advance();
+                return makeToken(TERM_COMMA, ",");
             default:
             {
                 std::string msg = "Unexpected character: ";

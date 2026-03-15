@@ -66,18 +66,29 @@ namespace minilang
             return;
         }
 
+        std::vector<Type> paramTypes;
+        for (auto& param : node.parameters)
+            paramTypes.push_back(param->type);
+
         SymbolEntry* funcEntry = m_currentTable->declareFunction(node.name, node.returnType, node.pos);
         if (!funcEntry)
         {
             error(node.pos, "Cannot declare function '" + node.name + "'");
             return;
         }
+        funcEntry->paramTypes = paramTypes;
         node.symbol = funcEntry;
 
         m_currentTable->enterScope();
         m_functionStack.push_back(&node);
 
-        if (node.body) node.body->accept(*this);
+        for (auto& param : node.parameters)
+        {
+            param->accept(*this);
+        }
+
+        if (node.body)
+            node.body->accept(*this);
 
         m_functionStack.pop_back();
         m_currentTable->exitScope();
@@ -359,6 +370,28 @@ namespace minilang
             return;
         }
         
+        if (node.arguments.size() != entry->paramTypes.size())
+        {
+            error(node.pos, "Function '" + node.callee->toString() + "' expects " +
+                std::to_string(entry->paramTypes.size()) + " argument(s), but " +
+                std::to_string(node.arguments.size()) + " given");
+            node.exprType = Type::ERROR;
+            return;
+        }
+
+        for (size_t i = 0; i < node.arguments.size(); ++i)
+        {
+            node.arguments[i]->accept(*this);
+            Type argType = node.arguments[i]->exprType;
+            if (argType == Type::ERROR) continue;
+            if (argType != entry->paramTypes[i])
+            {
+                error(node.arguments[i]->pos, "Argument " + std::to_string(i+1) +
+                    " type mismatch: expected " + (entry->paramTypes[i] == Type::INT ? "int" : "bool") +
+                    ", got " + (argType == Type::INT ? "int" : "bool"));
+            }
+        }
+
         node.exprType = entry->type;
         node.symbol = entry;
     }
@@ -391,6 +424,16 @@ namespace minilang
     void SemanticAnalyzer::visit(ExpressionStmt& node)
     {
         node.expr->accept(*this);
+    }
+
+    void SemanticAnalyzer::visit(ParameterList& node)
+    {
+
+    }
+
+    void SemanticAnalyzer::visit(ArgumentList& node)
+    {
+
     }
 
 } // namespace minilang

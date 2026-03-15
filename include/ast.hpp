@@ -43,6 +43,8 @@ namespace minilang
     class CallExpr;
     class ReturnStmt;
     class ExpressionStmt;
+    class ParameterList;
+    class ArgumentList;
 
     class Visitor
     {
@@ -78,6 +80,9 @@ namespace minilang
         virtual void visit(ReturnStmt& node) = 0;
         virtual void visit(CallExpr& node) = 0;
         virtual void visit(ExpressionStmt& node) = 0;
+
+        virtual void visit(ParameterList& node) = 0;
+        virtual void visit(ArgumentList& node) = 0;
     };
 
     class Node
@@ -196,8 +201,10 @@ namespace minilang
         std::unique_ptr<Block> body;
         SymbolEntry* symbol;
 
-        FuncDecl(std::string n, Type ret, std::unique_ptr<Block> b, Position p)
-            : Declaration(p), name(std::move(n)), returnType(ret), body(std::move(b)), symbol(nullptr) {}
+        std::vector<std::unique_ptr<VarDecl>> parameters;
+
+        FuncDecl(std::string n, Type ret, std::vector<std::unique_ptr<VarDecl>> params, std::unique_ptr<Block> b, Position p)
+            : Declaration(p), name(std::move(n)), returnType(ret), parameters(std::move(params)), body(std::move(b)), symbol(nullptr) {}
 
         void accept(Visitor& v) override { v.visit(*this); }
     };
@@ -342,10 +349,10 @@ namespace minilang
     public:
         std::unique_ptr<QualifiedIdentifier> callee;
         SymbolEntry* symbol;
-        // std::vector<std::unique_ptr<Expression>> arguments;
+        std::vector<std::unique_ptr<Expression>> arguments;
 
-        CallExpr(std::unique_ptr<QualifiedIdentifier> c, Position p)
-            : Expression(p), callee(std::move(c)), symbol(nullptr) {}
+        CallExpr(std::unique_ptr<QualifiedIdentifier> c, std::vector<std::unique_ptr<Expression>> args, Position p)
+            : Expression(p), callee(std::move(c)), arguments(std::move(args)), symbol(nullptr) {}
 
         void accept(Visitor& v) override { v.visit(*this); }
     };
@@ -360,6 +367,31 @@ namespace minilang
 
         void accept(Visitor& v) override { v.visit(*this); }
     };
+    
+
+    class ParameterList : public Node
+    {
+    public:
+        std::vector<std::unique_ptr<VarDecl>> parameters;
+        ParameterList(std::vector<std::unique_ptr<VarDecl>> params, Position p)
+            : Node(p), parameters(std::move(params)) {}
+        void accept(Visitor& v) override {}
+    };
+
+    class ArgumentList : public Node
+    {
+    public:
+        std::vector<std::unique_ptr<Expression>> arguments;
+        ArgumentList(std::vector<std::unique_ptr<Expression>> args, Position p)
+            : Node(p), arguments(std::move(args)) {}
+        void accept(Visitor& v) override {}
+    };
+
+
+
+
+
+
 
     class Program : public Node
     {

@@ -20,6 +20,7 @@ namespace minilang
         Position declPos;
         bool initialized;
         SymbolTable* scope;
+        std::vector<Type> paramTypes;
 
         SymbolEntry() : name(""), type(Type::ERROR), declPos(), initialized(false) {}
 

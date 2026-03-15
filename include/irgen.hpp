@@ -48,6 +48,9 @@ namespace minilang
         void visit(ReturnStmt& node)            override;
         void visit(ExpressionStmt& node)        override;
 
+        void visit(ParameterList& node)         override;
+        void visit(ArgumentList& node)          override;
+
     private:
         bool m_collecting;
 
