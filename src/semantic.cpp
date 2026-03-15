@@ -32,18 +32,17 @@ namespace minilang
             stmt->accept(*this);
     }
 
-    void SemanticAnalyzer::visit(Declaration& node)
+    void SemanticAnalyzer::visit(VarDecl& node)
     {
         if (node.initializer)
         {
             node.initializer->accept(*this);
             if (node.initializer->exprType != Type::ERROR)
             {
-                Type declType = (node.type == Declaration::Type::INT) ? Type::INT : Type::BOOL;
-                if (node.initializer->exprType != declType)
+                if (node.initializer->exprType != node.type)
                 {
                     std::string msg = "Type mismatch in initialization: expected ";
-                    msg += (declType == Type::INT ? "int" : "bool");
+                    msg += (node.type == Type::INT ? "int" : "bool");
                     msg += ", got ";
                     msg += (node.initializer->exprType == Type::INT ? "int" : "bool");
                     error(node.pos, msg);
@@ -51,12 +50,48 @@ namespace minilang
             }
         }
 
-        Type declType = (node.type == Declaration::Type::INT) ? Type::INT : Type::BOOL;
-        SymbolEntry* entry = m_currentTable->declare(node.name, declType, node.pos);
+        SymbolEntry* entry = m_currentTable->declare(node.name, node.type, node.pos);
         if (!entry)
             error(node.pos, "Redeclaration of variable '" + node.name + "'");
         else
             node.symbol = entry;
+    }
+
+    void SemanticAnalyzer::visit(FuncDecl& node)
+    {
+        SymbolEntry* existing = m_currentTable->lookup(node.name);
+        if (existing)
+        {
+            error(node.pos, "Redeclaration of '" + node.name + "'");
+            return;
+        }
+
+        std::vector<Type> paramTypes;
+        for (auto& param : node.parameters)
+            paramTypes.push_back(param->type);
+
+        SymbolEntry* funcEntry = m_currentTable->declareFunction(node.name, node.returnType, node.pos);
+        if (!funcEntry)
+        {
+            error(node.pos, "Cannot declare function '" + node.name + "'");
+            return;
+        }
+        funcEntry->paramTypes = paramTypes;
+        node.symbol = funcEntry;
+
+        m_currentTable->enterScope();
+        m_functionStack.push_back(&node);
+
+        for (auto& param : node.parameters)
+        {
+            param->accept(*this);
+        }
+
+        if (node.body)
+            node.body->accept(*this);
+
+        m_functionStack.pop_back();
+        m_currentTable->exitScope();
     }
 
     void SemanticAnalyzer::visit(Assignment& node)
@@ -308,6 +343,97 @@ namespace minilang
             decl->accept(*this);
         for (auto& stmt : node.statements)
             stmt->accept(*this);
+    }
+
+    void SemanticAnalyzer::visit(CallExpr& node)
+    {
+        node.callee->accept(*this);
+        
+        if (node.callee->exprType == Type::ERROR)
+        {
+            node.exprType = Type::ERROR;
+            return;
+        }
+        
+        SymbolEntry* entry = node.callee->symbol;
+        if (!entry)
+        {
+            error(node.pos, "Internal error: callee symbol not set");
+            node.exprType = Type::ERROR;
+            return;
+        }
+        
+        if (entry->kind != SymbolKind::FUNCTION)
+        {
+            error(node.pos, "'" + node.callee->toString() + "' is not a function");
+            node.exprType = Type::ERROR;
+            return;
+        }
+        
+        if (node.arguments.size() != entry->paramTypes.size())
+        {
+            error(node.pos, "Function '" + node.callee->toString() + "' expects " +
+                std::to_string(entry->paramTypes.size()) + " argument(s), but " +
+                std::to_string(node.arguments.size()) + " given");
+            node.exprType = Type::ERROR;
+            return;
+        }
+
+        for (size_t i = 0; i < node.arguments.size(); ++i)
+        {
+            node.arguments[i]->accept(*this);
+            Type argType = node.arguments[i]->exprType;
+            if (argType == Type::ERROR) continue;
+            if (argType != entry->paramTypes[i])
+            {
+                error(node.arguments[i]->pos, "Argument " + std::to_string(i+1) +
+                    " type mismatch: expected " + (entry->paramTypes[i] == Type::INT ? "int" : "bool") +
+                    ", got " + (argType == Type::INT ? "int" : "bool"));
+            }
+        }
+
+        node.exprType = entry->type;
+        node.symbol = entry;
+    }
+
+    void SemanticAnalyzer::visit(ReturnStmt& node)
+    {
+        if (m_functionStack.empty())
+        {
+            error(node.pos, "Return statement outside function");
+            return;
+        }
+
+        FuncDecl* currentFunc = m_functionStack.back();
+        node.value->accept(*this);
+
+        Type exprType = node.value->exprType;
+        if (exprType == Type::ERROR)
+            return;
+
+        if (exprType != currentFunc->returnType)
+        {
+            std::string msg = "Return type mismatch: expected ";
+            msg += (currentFunc->returnType == Type::INT ? "int" : "bool");
+            msg += ", got ";
+            msg += (exprType == Type::INT ? "int" : "bool");
+            error(node.pos, msg);
+        }
+    }
+
+    void SemanticAnalyzer::visit(ExpressionStmt& node)
+    {
+        node.expr->accept(*this);
+    }
+
+    void SemanticAnalyzer::visit(ParameterList& node)
+    {
+
+    }
+
+    void SemanticAnalyzer::visit(ArgumentList& node)
+    {
+
     }
 
 } // namespace minilang

@@ -19,7 +19,10 @@ namespace minilang
         // Visitor implementation
         void visit(Program& node)           override;
 
-        void visit(Declaration& node)       override;
+
+        void visit(VarDecl& node)           override;
+        void visit(FuncDecl& node)          override;
+
         void visit(Assignment& node)        override;
         void visit(IfStmt& node)            override;
         void visit(WhileStmt& node)         override;
@@ -42,10 +45,22 @@ namespace minilang
         void visit(NamespaceDecl& node)         override;
         void visit(QualifiedIdentifier& node)   override;
 
+        void visit(CallExpr& node)              override;
+        void visit(ReturnStmt& node)            override;
+        void visit(ExpressionStmt& node)        override;
+
+        void visit(ParameterList& node)         override;
+        void visit(ArgumentList& node)          override;
+
+
+
+
+
     private:
         SymbolTable m_globalTable;
         SymbolTable* m_currentTable;
         std::vector<SymbolTable*> m_tableStack;
+        std::vector<FuncDecl*> m_functionStack;
         bool m_hasError;
 
         void error(const Position& pos, const std::string& message);

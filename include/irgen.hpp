@@ -25,7 +25,6 @@ namespace minilang
 
         // Visitor implementation
         void visit(Program& node)               override;
-        void visit(Declaration& node)           override;
         void visit(Assignment& node)            override;
         void visit(IfStmt& node)                override;
         void visit(WhileStmt& node)             override;
@@ -43,12 +42,24 @@ namespace minilang
         void visit(NamespaceDecl& node)         override;
         void visit(QualifiedIdentifier& node)   override;
 
+        void visit(VarDecl& node)               override;
+        void visit(FuncDecl& node)              override;
+        void visit(CallExpr& node)              override;
+        void visit(ReturnStmt& node)            override;
+        void visit(ExpressionStmt& node)        override;
+
+        void visit(ParameterList& node)         override;
+        void visit(ArgumentList& node)          override;
+
     private:
         bool m_collecting;
 
         llvm::LLVMContext& m_context;
         llvm::Module* m_module;
         llvm::IRBuilder<> m_builder;
+        llvm::Function* m_currentFunction;
+        llvm::BasicBlock* m_currentEntryBlock;
+        std::unordered_map<SymbolEntry*, llvm::Function*> m_functionMap;
         std::unordered_map<SymbolEntry*, llvm::AllocaInst*> m_allocaMap;
         std::vector<llvm::Value*> m_valueStack;
 

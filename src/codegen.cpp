@@ -23,12 +23,11 @@ namespace minilang
     {
         llvm::legacy::PassManager passManager;
 
-        passManager.add(llvm::createReassociatePass());
-        passManager.add(llvm::createGVNPass());
-        passManager.add(llvm::createCFGSimplificationPass());
-        passManager.add(llvm::createDeadCodeEliminationPass());
-        
-        passManager.add(llvm::createLoopUnrollPass());
+        //passManager.add(llvm::createConstantHoistingPass());
+        //passManager.add(llvm::createGVNPass());
+        //passManager.add(llvm::createCFGSimplificationPass());
+        //passManager.add(llvm::createPromoteMemoryToRegisterPass());
+        //passManager.add(llvm::createInstructionCombiningPass());
 
         passManager.run(*Mod);
     }
@@ -72,7 +71,7 @@ namespace minilang
             opt,
             std::nullopt,
             std::nullopt,
-            llvm::CodeGenOptLevel::Default,
+            llvm::CodeGenOptLevel::None,
             false
         );
 

@@ -50,7 +50,12 @@ namespace grammar
         TERM_LPAREN,
         TERM_RPAREN,
         TERM_AT,
-        TERM_SCOPE, 
+        TERM_SCOPE,
+        TERM_FUNC,
+        TERM_ARROW,
+        TERM_RETURN,
+        TERM_COMMA,
+
         TERM_COUNT,
         TERM_ERROR
     };
@@ -82,6 +87,9 @@ namespace grammar
         NONTERM_PRIMARY,
         NONTERM_NAMESPACEDECL,
         NONTERM_QUALIFIED_IDENTIFIER,
+        NONTERM_PARAMETER,
+        NONTERM_PARAMETER_LIST,
+        NONTERM_ARGUMENT_LIST,
         NONTERM_COUNT
     };
 
@@ -143,6 +151,20 @@ namespace grammar
         PROD_NAMESPACEDECL,
         PROD_QUALIFIED_ID1,
         PROD_QUALIFIED_ID2,
+
+        PROD_DECLARATION_FUNC,
+        PROD_RETURN_STMT,
+        PROD_CALL_EXPR,
+        PROD_EXPRESSION_STMT,
+
+        PROD_PARAMETER,
+        PROD_PARAMETER_LIST_EMPTY,
+        PROD_PARAMETER_LIST_SINGLE,
+        PROD_PARAMETER_LIST_MULTI,
+        PROD_ARGUMENT_LIST_EMPTY,
+        PROD_ARGUMENT_LIST_SINGLE,
+        PROD_ARGUMENT_LIST_MULTI,
+        
         PROD_COUNT
     };
 
