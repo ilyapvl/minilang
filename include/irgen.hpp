@@ -46,6 +46,7 @@ namespace minilang
         void visit(FuncDecl& node)              override;
         void visit(CallExpr& node)              override;
         void visit(ReturnStmt& node)            override;
+        void visit(ExpressionStmt& node)        override;
 
     private:
         bool m_collecting;
@@ -53,6 +54,9 @@ namespace minilang
         llvm::LLVMContext& m_context;
         llvm::Module* m_module;
         llvm::IRBuilder<> m_builder;
+        llvm::Function* m_currentFunction;
+        llvm::BasicBlock* m_currentEntryBlock;
+        std::unordered_map<SymbolEntry*, llvm::Function*> m_functionMap;
         std::unordered_map<SymbolEntry*, llvm::AllocaInst*> m_allocaMap;
         std::vector<llvm::Value*> m_valueStack;
 

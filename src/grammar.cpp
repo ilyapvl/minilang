@@ -125,7 +125,9 @@ namespace grammar
 
         addProduction(PROD_DECLARATION_FUNC, NONTERM_DECLARATION, {TERM_FUNC, TERM_IDENTIFIER, TERM_ARROW, NONTERM_TYPE, NONTERM_BLOCK});
         addProduction(PROD_RETURN_STMT, NONTERM_STATEMENT, {TERM_RETURN, NONTERM_EXPRESSION, TERM_SEMICOLON});
-        addProduction(PROD_CALL_EXPR, NONTERM_PRIMARY, {TERM_IDENTIFIER, TERM_LPAREN, TERM_RPAREN});
+        addProduction(PROD_CALL_EXPR, NONTERM_PRIMARY, {NONTERM_QUALIFIED_IDENTIFIER, TERM_LPAREN, TERM_RPAREN});
+        addProduction(PROD_EXPRESSION_STMT, NONTERM_STATEMENT, {NONTERM_EXPRESSION, TERM_SEMICOLON});
+
     }
 
     void Grammar::computeFirst()
@@ -749,6 +751,7 @@ namespace grammar
                 case TERM_FUNC:         return "func";
                 case TERM_RETURN:       return "return";
                 case TERM_ARROW:        return "->";
+                case TERM_COMMA:        return ",";
 
                 default:                return "unknown_term";
             }

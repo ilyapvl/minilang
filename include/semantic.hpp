@@ -47,12 +47,17 @@ namespace minilang
 
         void visit(CallExpr& node)              override;
         void visit(ReturnStmt& node)            override;
+        void visit(ExpressionStmt& node)        override;
+
+
+
 
 
     private:
         SymbolTable m_globalTable;
         SymbolTable* m_currentTable;
         std::vector<SymbolTable*> m_tableStack;
+        std::vector<FuncDecl*> m_functionStack;
         bool m_hasError;
 
         void error(const Position& pos, const std::string& message);

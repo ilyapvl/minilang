@@ -42,6 +42,7 @@ namespace minilang
     class QualifiedIdentifier;
     class CallExpr;
     class ReturnStmt;
+    class ExpressionStmt;
 
     class Visitor
     {
@@ -76,6 +77,7 @@ namespace minilang
 
         virtual void visit(ReturnStmt& node) = 0;
         virtual void visit(CallExpr& node) = 0;
+        virtual void visit(ExpressionStmt& node) = 0;
     };
 
     class Node
@@ -338,11 +340,23 @@ namespace minilang
     class CallExpr : public Expression
     {
     public:
-        std::string name;
+        std::unique_ptr<QualifiedIdentifier> callee;
+        SymbolEntry* symbol;
         // std::vector<std::unique_ptr<Expression>> arguments;
 
-        CallExpr(std::string n, Position p)
-            : Expression(p), name(std::move(n)) {}
+        CallExpr(std::unique_ptr<QualifiedIdentifier> c, Position p)
+            : Expression(p), callee(std::move(c)), symbol(nullptr) {}
+
+        void accept(Visitor& v) override { v.visit(*this); }
+    };
+
+    class ExpressionStmt : public Statement
+    {
+    public:
+        std::unique_ptr<Expression> expr;
+
+        ExpressionStmt(std::unique_ptr<Expression> e, Position p)
+            : Statement(p), expr(std::move(e)) {}
 
         void accept(Visitor& v) override { v.visit(*this); }
     };

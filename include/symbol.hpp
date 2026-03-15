@@ -9,18 +9,24 @@
 
 namespace minilang
 {
+    enum class SymbolKind { VARIABLE, FUNCTION };
+    class SymbolTable;
 
     struct SymbolEntry // FIXME mirroring name and type fields in AST classes
     {
         std::string name;
+        SymbolKind kind;
         Type type;
         Position declPos;
         bool initialized;
+        SymbolTable* scope;
 
         SymbolEntry() : name(""), type(Type::ERROR), declPos(), initialized(false) {}
 
-        SymbolEntry(const std::string& n, Type t, const Position& p)
-            : name(n), type(t), declPos(p), initialized(false) {}
+        SymbolEntry(const std::string& n, SymbolKind k, Type t, const Position& p, SymbolTable* s) 
+            : name(n), kind(k), type(t), declPos(p), initialized(false), scope(s) {}
+
+        std::string getQualifiedName() const;
     };
 
     class SymbolTable
@@ -33,6 +39,7 @@ namespace minilang
         void exitScope();
 
         SymbolEntry* declare(const std::string& name, Type type, const Position& pos);
+        SymbolEntry* declareFunction(const std::string& name, Type returnType, const Position& pos);
 
         // search qualified ::
         SymbolEntry* lookup(const std::string& name);
@@ -42,6 +49,8 @@ namespace minilang
         SymbolTable* getOrCreateNamespace(const std::string& name);
 
         const std::string& getName() const { return m_name; }
+
+        std::string getQualifiedName() const;
 
     private:
         std::string m_name;

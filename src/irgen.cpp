@@ -31,47 +31,17 @@ namespace minilang
 
     bool IRGenerator::generate(Program* ast)
     {
-        // main function: i32()
-        llvm::FunctionType* mainType = llvm::FunctionType::get(
-            llvm::Type::getInt32Ty(m_context), false);
-        m_mainFunction = llvm::Function::Create(
-            mainType, llvm::Function::ExternalLinkage, "_main", m_module);
-
-        llvm::BasicBlock* entry = llvm::BasicBlock::Create(m_context, "entry", m_mainFunction);
-        m_builder.SetInsertPoint(entry);
-        m_entryBlock = entry;
-
-        // first pass: collect declarations and create allocas
         m_collecting = true;
         ast->accept(*this);
         m_collecting = false;
-
-        m_builder.SetInsertPoint(entry);
-
-        // second pass: generate IR
         ast->accept(*this);
 
-        // add ret 0 if current block is not terminated
-        if (!m_builder.GetInsertBlock()->getTerminator())
-        {
-            m_builder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(m_context), 0));
-        }
-
-        // verification
-        bool hasError = llvm::verifyFunction(*m_mainFunction, &llvm::errs());
-        if (hasError)
-        {
-            std::cerr << "Function verification failed" << std::endl;
-            return false;
-        }
-
-        hasError = llvm::verifyModule(*m_module, &llvm::errs());
+        bool hasError = llvm::verifyModule(*m_module, &llvm::errs());
         if (hasError)
         {
             std::cerr << "Module verification failed" << std::endl;
             return false;
         }
-
         return true;
     }
 
@@ -90,38 +60,42 @@ namespace minilang
 
     void IRGenerator::visit(VarDecl& node)
     {
-        if (m_collecting)
-        {
-            llvm::Type* llvmType = nullptr;
-            if (node.type == Type::INT)
-                llvmType = llvm::Type::getInt32Ty(m_context);
-            else if (node.type == Type::BOOL)
-                llvmType = llvm::Type::getInt1Ty(m_context);
-            else
-            {
-                std::cerr << "Unknown variable type" << std::endl;
-                return;
-            }
+        if (m_collecting) return;
+ 
 
-            llvm::AllocaInst* alloca = createAllocaInEntry(llvmType, node.name);
-            if (node.symbol)
-                m_allocaMap[node.symbol] = alloca;
-            else
-                std::cerr << "VarDecl without symbol entry" << std::endl;
+        if (!m_currentFunction)
+        {
+            std::cerr << "VarDecl outside function not supported yet" << std::endl;
             return;
         }
 
-        // second pass for initialization
+        llvm::Type* llvmType = nullptr;
+        if (node.type == Type::INT)
+            llvmType = llvm::Type::getInt32Ty(m_context);
+        else if (node.type == Type::BOOL)
+            llvmType = llvm::Type::getInt1Ty(m_context);
+        else
+        {
+            std::cerr << "Unknown variable type" << std::endl;
+            return;
+        }
+
+        auto savedIP = m_builder.saveIP();
+        m_builder.SetInsertPoint(m_currentEntryBlock);
+        llvm::AllocaInst* alloca = m_builder.CreateAlloca(llvmType, nullptr, node.name);
+        m_builder.restoreIP(savedIP);
+
+        if (node.symbol)
+            m_allocaMap[node.symbol] = alloca;
+        else
+            std::cerr << "VarDecl without symbol entry" << std::endl;
+
         if (node.initializer)
         {
             node.initializer->accept(*this);
             llvm::Value* initVal = popValue();
             if (initVal)
-            {
-                auto it = m_allocaMap.find(node.symbol);
-                if (it != m_allocaMap.end())
-                    m_builder.CreateStore(initVal, it->second);
-            }
+                m_builder.CreateStore(initVal, alloca);
         }
     }
 
@@ -129,8 +103,44 @@ namespace minilang
     {
         if (m_collecting)
         {
+            llvm::Type* retType = (node.returnType == Type::INT) ?
+                llvm::Type::getInt32Ty(m_context) : llvm::Type::getInt1Ty(m_context);
+            llvm::FunctionType* funcType = llvm::FunctionType::get(retType, false);
+            if (node.name == "main") node.name = "_main";
+
+            llvm::Function* func = llvm::Function::Create(
+                funcType, llvm::Function::ExternalLinkage, node.name, m_module);
+            m_functionMap[node.symbol] = func;
             return;
         }
+
+        auto it = m_functionMap.find(node.symbol);
+        if (it == m_functionMap.end())
+        {
+            std::cerr << "Function not found: " << node.name << std::endl;
+            return;
+        }
+        llvm::Function* func = it->second;
+
+        llvm::BasicBlock* entry = llvm::BasicBlock::Create(m_context, "entry", func);
+        m_builder.SetInsertPoint(entry);
+        m_currentFunction = func;
+        m_currentEntryBlock = entry;
+
+
+        if (node.body)
+            node.body->accept(*this);
+
+        if (!m_builder.GetInsertBlock()->getTerminator())
+        {
+            if (node.returnType == Type::INT)
+                m_builder.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(m_context), 0));
+            else
+                m_builder.CreateRet(llvm::ConstantInt::getBool(m_context, false));
+        }
+
+        m_currentFunction = nullptr;
+        m_currentEntryBlock = nullptr;
     }
 
     void IRGenerator::visit(Assignment& node)
@@ -433,12 +443,37 @@ namespace minilang
 
     void IRGenerator::visit(CallExpr& node)
     {
-
+        if (m_collecting) return;
+        auto it = m_functionMap.find(node.symbol);
+        if (it == m_functionMap.end())
+        {
+            std::cerr << "Function not found: " << node.callee->toString() << std::endl;
+            pushValue(nullptr);
+            return;
+        }
+        llvm::Function* callee = it->second;
+        llvm::Value* result = m_builder.CreateCall(callee, {}, node.callee->toString() + "_call");
+        pushValue(result);
     }
 
     void IRGenerator::visit(ReturnStmt& node)
     {
+        if (m_collecting) return;
+        node.value->accept(*this);
+        llvm::Value* val = popValue();
+        if (val)
+            m_builder.CreateRet(val);
+    }
 
+    void IRGenerator::visit(ExpressionStmt& node)
+    {
+        if (m_collecting)
+        {
+            node.expr->accept(*this);
+            return;
+        }
+        node.expr->accept(*this);
+        popValue();
     }
 
 } // namespace minilang

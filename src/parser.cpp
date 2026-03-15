@@ -514,10 +514,26 @@ namespace minilang
             case PROD_CALL_EXPR:
             {
                 if (children.size() < 3) return nullptr;
-                auto var = cast_node<Variable>(children[0]);
-                if (!var) return nullptr;
-                return std::make_unique<CallExpr>(var->name, var->pos);
+                auto qualId = cast_node<QualifiedIdentifier>(children[0]);
+                if (!qualId) return nullptr;
+                return std::make_unique<CallExpr>(std::move(qualId), qualId->pos);
             }
+
+            case PROD_EXPRESSION_STMT:
+            {
+                auto expr = cast_node<Expression>(children[0]);
+                if (!expr) return nullptr;
+                return std::make_unique<ExpressionStmt>(std::move(expr), expr->pos);
+            }
+
+
+
+
+
+
+
+
+            
 
             default:
                 std::cerr << "Unknown production id: " << prod_id << std::endl;

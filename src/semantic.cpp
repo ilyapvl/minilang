@@ -59,7 +59,28 @@ namespace minilang
 
     void SemanticAnalyzer::visit(FuncDecl& node)
     {
+        SymbolEntry* existing = m_currentTable->lookup(node.name);
+        if (existing)
+        {
+            error(node.pos, "Redeclaration of '" + node.name + "'");
+            return;
+        }
 
+        SymbolEntry* funcEntry = m_currentTable->declareFunction(node.name, node.returnType, node.pos);
+        if (!funcEntry)
+        {
+            error(node.pos, "Cannot declare function '" + node.name + "'");
+            return;
+        }
+        node.symbol = funcEntry;
+
+        m_currentTable->enterScope();
+        m_functionStack.push_back(&node);
+
+        if (node.body) node.body->accept(*this);
+
+        m_functionStack.pop_back();
+        m_currentTable->exitScope();
     }
 
     void SemanticAnalyzer::visit(Assignment& node)
@@ -315,12 +336,61 @@ namespace minilang
 
     void SemanticAnalyzer::visit(CallExpr& node)
     {
-
+        node.callee->accept(*this);
+        
+        if (node.callee->exprType == Type::ERROR)
+        {
+            node.exprType = Type::ERROR;
+            return;
+        }
+        
+        SymbolEntry* entry = node.callee->symbol;
+        if (!entry)
+        {
+            error(node.pos, "Internal error: callee symbol not set");
+            node.exprType = Type::ERROR;
+            return;
+        }
+        
+        if (entry->kind != SymbolKind::FUNCTION)
+        {
+            error(node.pos, "'" + node.callee->toString() + "' is not a function");
+            node.exprType = Type::ERROR;
+            return;
+        }
+        
+        node.exprType = entry->type;
+        node.symbol = entry;
     }
 
     void SemanticAnalyzer::visit(ReturnStmt& node)
     {
+        if (m_functionStack.empty())
+        {
+            error(node.pos, "Return statement outside function");
+            return;
+        }
 
+        FuncDecl* currentFunc = m_functionStack.back();
+        node.value->accept(*this);
+
+        Type exprType = node.value->exprType;
+        if (exprType == Type::ERROR)
+            return;
+
+        if (exprType != currentFunc->returnType)
+        {
+            std::string msg = "Return type mismatch: expected ";
+            msg += (currentFunc->returnType == Type::INT ? "int" : "bool");
+            msg += ", got ";
+            msg += (exprType == Type::INT ? "int" : "bool");
+            error(node.pos, msg);
+        }
+    }
+
+    void SemanticAnalyzer::visit(ExpressionStmt& node)
+    {
+        node.expr->accept(*this);
     }
 
 } // namespace minilang

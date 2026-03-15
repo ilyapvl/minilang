@@ -54,6 +54,7 @@ namespace grammar
         TERM_FUNC,
         TERM_ARROW,
         TERM_RETURN,
+        TERM_COMMA,
 
         TERM_COUNT,
         TERM_ERROR
@@ -86,6 +87,9 @@ namespace grammar
         NONTERM_PRIMARY,
         NONTERM_NAMESPACEDECL,
         NONTERM_QUALIFIED_IDENTIFIER,
+        NONTERM_PARAMETER,
+        NONTERM_PARAMETER_LIST,
+        NONTERM_ARGUMENT_LIST,
         NONTERM_COUNT
     };
 
@@ -151,6 +155,7 @@ namespace grammar
         PROD_DECLARATION_FUNC,
         PROD_RETURN_STMT,
         PROD_CALL_EXPR,
+        PROD_EXPRESSION_STMT,
         
         PROD_COUNT
     };

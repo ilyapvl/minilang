@@ -28,7 +28,7 @@ namespace minilang
         if (current.find(name) != current.end())
             return nullptr;
 
-        auto it = current.emplace(name, SymbolEntry(name, type, pos)).first;
+        auto it = current.emplace(name, SymbolEntry(name, SymbolKind::VARIABLE, type, pos, this)).first;
         return &it->second;
     }
 
@@ -70,6 +70,24 @@ namespace minilang
         return ptr;
     }
 
+
+    SymbolEntry* SymbolTable::declareFunction(const std::string& name, Type returnType, const Position& pos)
+    {
+        auto& current = m_scopes.back();
+        if (current.find(name) != current.end())
+            return nullptr;
+
+        auto it = current.emplace(name, SymbolEntry(name, SymbolKind::FUNCTION, returnType, pos, this)).first;
+        return &it->second;
+    }
+
+    std::string SymbolTable::getQualifiedName() const
+    {
+        if (m_parent && !m_parent->getName().empty())
+            return m_parent->getQualifiedName() + "::" + m_name;
+        else
+            return m_name;
+    }
 
 
 } // namespace minilang
