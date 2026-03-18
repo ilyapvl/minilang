@@ -24,10 +24,13 @@ namespace minilang
         llvm::legacy::PassManager passManager;
 
         //passManager.add(llvm::createConstantHoistingPass());
-        //passManager.add(llvm::createGVNPass());
-        //passManager.add(llvm::createCFGSimplificationPass());
+        passManager.add(llvm::createGVNPass());
+        passManager.add(llvm::createCFGSimplificationPass());
         //passManager.add(llvm::createPromoteMemoryToRegisterPass());
         //passManager.add(llvm::createInstructionCombiningPass());
+
+        //passManager.add(llvm::createSinkingPass());
+        
 
         passManager.run(*Mod);
     }

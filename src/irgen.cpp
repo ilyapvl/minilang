@@ -1,4 +1,5 @@
 #include "irgen.hpp"
+#include "llvm/IR/InlineAsm.h"
 #include <iostream>
 #include <cassert>
 
@@ -6,11 +7,19 @@ namespace minilang
 {
 
     IRGenerator::IRGenerator(llvm::LLVMContext& context, const std::string& moduleName)
-        : m_context(context)
-        , m_builder(context)
-        , m_mainFunction(nullptr)
-        , m_entryBlock(nullptr)
-        , m_collecting(false)
+        : 
+        m_context(context),
+        m_builder(context),
+        m_mainFunction(nullptr),
+        m_entryBlock(nullptr),
+        m_sysWriteFunc(nullptr),
+        m_sysReadFunc(nullptr),
+        m_intToStrFunc(nullptr),
+        m_strToIntFunc(nullptr),
+        m_printIntFunc(nullptr),
+        m_printBoolFunc(nullptr),
+        m_readIntFunc(nullptr),
+        m_collecting(false)
     {
         m_module = new llvm::Module(moduleName, context);
     }
@@ -27,6 +36,16 @@ namespace minilang
 
     bool IRGenerator::generate(Program* ast)
     {
+
+        declareSysWrappers();
+
+        // builtin
+        createIntToString();
+        createStringToInt();
+        createPrintInt();
+        createPrintBool();
+        createReadInt();
+
         m_collecting = true;
         ast->accept(*this);
         m_collecting = false;
@@ -40,6 +59,407 @@ namespace minilang
         }
         return true;
     }
+
+
+
+
+    // BUILTIN FUNCTIONS ==================================================================================================
+
+    void IRGenerator::declareSysWrappers()
+    {
+        llvm::Type* i32Ty = llvm::Type::getInt32Ty(m_context);
+        llvm::Type* i8PtrTy = llvm::PointerType::getUnqual(m_context);
+
+        llvm::FunctionType* writeType = llvm::FunctionType::get(i32Ty, {i32Ty, i8PtrTy, i32Ty}, false);
+        m_sysWriteFunc = llvm::Function::Create(writeType, llvm::Function::ExternalLinkage, "__sys_write", m_module);
+
+        llvm::FunctionType* readType = llvm::FunctionType::get(i32Ty, {i32Ty, i8PtrTy, i32Ty}, false);
+        m_sysReadFunc = llvm::Function::Create(readType, llvm::Function::ExternalLinkage, "__sys_read", m_module);
+    }
+
+    void IRGenerator::createIntToString()
+    {
+        llvm::Type* i32Ty = llvm::Type::getInt32Ty(m_context);
+        llvm::Type* i8Ty = llvm::Type::getInt8Ty(m_context);
+        llvm::Type* i8PtrTy = llvm::PointerType::getUnqual(m_context);
+
+        // int __int_to_str(int val, char* buf)
+        llvm::FunctionType* funcType = llvm::FunctionType::get(i32Ty, {i32Ty, i8PtrTy}, false);
+        m_intToStrFunc = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, "__int_to_str", m_module);
+
+
+        llvm::BasicBlock* entryBB       = llvm::BasicBlock::Create(m_context, "entry", m_intToStrFunc);
+        llvm::BasicBlock* negCheckBB    = llvm::BasicBlock::Create(m_context, "negcheck", m_intToStrFunc);
+        llvm::BasicBlock* zeroBB        = llvm::BasicBlock::Create(m_context, "zero", m_intToStrFunc);
+        llvm::BasicBlock* nonZeroBB     = llvm::BasicBlock::Create(m_context, "nonzero", m_intToStrFunc);
+        llvm::BasicBlock* loopHeaderBB  = llvm::BasicBlock::Create(m_context, "loopheader", m_intToStrFunc);
+        llvm::BasicBlock* loopBodyBB    = llvm::BasicBlock::Create(m_context, "loopbody", m_intToStrFunc);
+        llvm::BasicBlock* loopEndBB     = llvm::BasicBlock::Create(m_context, "loopend", m_intToStrFunc);
+        llvm::BasicBlock* afterGenBB    = llvm::BasicBlock::Create(m_context, "aftergen", m_intToStrFunc);
+        llvm::BasicBlock* negBB         = llvm::BasicBlock::Create(m_context, "neg", m_intToStrFunc);
+        llvm::BasicBlock* posBB         = llvm::BasicBlock::Create(m_context, "pos", m_intToStrFunc);
+        llvm::BasicBlock* copyHeaderBB  = llvm::BasicBlock::Create(m_context, "copyheader", m_intToStrFunc);
+        llvm::BasicBlock* copyBodyBB    = llvm::BasicBlock::Create(m_context, "copybody", m_intToStrFunc);
+        llvm::BasicBlock* copyEndBB     = llvm::BasicBlock::Create(m_context, "copyend", m_intToStrFunc);
+        llvm::BasicBlock* returnBB      = llvm::BasicBlock::Create(m_context, "return", m_intToStrFunc);
+
+
+        m_builder.SetInsertPoint(entryBB);
+        auto args = m_intToStrFunc->arg_begin();
+        llvm::Value* val = args++;
+        llvm::Value* buf = args++;
+
+        llvm::Value* zero = llvm::ConstantInt::get(i32Ty, 0);
+        llvm::Value* one = llvm::ConstantInt::get(i32Ty, 1);
+        llvm::Value* ten = llvm::ConstantInt::get(i32Ty, 10);
+        llvm::Value* charZero = llvm::ConstantInt::get(i8Ty, '0');
+        llvm::Value* charMinus = llvm::ConstantInt::get(i8Ty, '-');
+
+        // negative?
+        llvm::Value* isNeg = m_builder.CreateICmpSLT(val, zero, "isneg");
+        llvm::Value* absVal = m_builder.CreateSelect(isNeg, m_builder.CreateNeg(val), val, "absval");
+
+        // zero?
+        llvm::Value* isZero = m_builder.CreateICmpEQ(absVal, zero, "iszero");
+        m_builder.CreateCondBr(isZero, zeroBB, negCheckBB);
+
+        // zeroBB
+        m_builder.SetInsertPoint(zeroBB);
+        m_builder.CreateStore(charZero, m_builder.CreateGEP(i8Ty, buf, zero));
+        m_builder.CreateBr(returnBB);
+
+        // negCheckBB
+        m_builder.SetInsertPoint(negCheckBB);
+
+        // temp buffer
+        llvm::AllocaInst* temp = m_builder.CreateAlloca(llvm::ArrayType::get(i8Ty, 12), nullptr, "temp");
+        llvm::Value* tempPtr = m_builder.CreateBitCast(temp, i8PtrTy);
+        m_builder.CreateBr(nonZeroBB);
+
+        // nonZeroBB
+        m_builder.SetInsertPoint(nonZeroBB);
+        m_builder.CreateBr(loopHeaderBB);
+
+        // loopHeaderBB
+        m_builder.SetInsertPoint(loopHeaderBB);
+        llvm::PHINode* phiVal = m_builder.CreatePHI(i32Ty, 2, "val");
+        phiVal->addIncoming(absVal, nonZeroBB);
+        llvm::PHINode* phiIdx = m_builder.CreatePHI(i32Ty, 2, "idx");
+        phiIdx->addIncoming(zero, nonZeroBB);
+        llvm::Value* loopCond = m_builder.CreateICmpUGT(phiVal, zero, "loopcond");
+        m_builder.CreateCondBr(loopCond, loopBodyBB, loopEndBB);
+
+        // loopBodyBB
+        m_builder.SetInsertPoint(loopBodyBB);
+        llvm::Value* digit = m_builder.CreateURem(phiVal, ten, "digit");
+        llvm::Value* ch = m_builder.CreateAdd(charZero, m_builder.CreateTrunc(digit, i8Ty), "ch");
+        llvm::Value* tempElem = m_builder.CreateGEP(i8Ty, tempPtr, phiIdx);
+        m_builder.CreateStore(ch, tempElem);
+        llvm::Value* nextVal = m_builder.CreateUDiv(phiVal, ten, "nextval");
+        llvm::Value* nextIdx = m_builder.CreateAdd(phiIdx, one, "nextidx");
+        phiVal->addIncoming(nextVal, loopBodyBB);
+        phiIdx->addIncoming(nextIdx, loopBodyBB);
+        m_builder.CreateBr(loopHeaderBB);
+
+        // loopEndBB
+        m_builder.SetInsertPoint(loopEndBB);
+        llvm::Value* numDigits = phiIdx;
+        m_builder.CreateBr(afterGenBB);
+
+        // afterGenBB
+        m_builder.SetInsertPoint(afterGenBB);
+        m_builder.CreateCondBr(isNeg, negBB, posBB);
+
+        // negBB
+        m_builder.SetInsertPoint(negBB);
+        m_builder.CreateStore(charMinus, m_builder.CreateGEP(i8Ty, buf, zero));
+        llvm::Value* bufAfterMinus = m_builder.CreateGEP(i8Ty, buf, one, "bufafterminus");
+        m_builder.CreateBr(copyHeaderBB);
+
+        // posBB
+        m_builder.SetInsertPoint(posBB);
+        llvm::Value* bufNoMinus = buf;
+        m_builder.CreateBr(copyHeaderBB);
+
+        // copyHeaderBB
+        m_builder.SetInsertPoint(copyHeaderBB);
+        llvm::PHINode* phiDest = m_builder.CreatePHI(i8PtrTy, 2, "dest");
+        phiDest->addIncoming(bufAfterMinus, negBB);
+        phiDest->addIncoming(bufNoMinus, posBB);
+        llvm::PHINode* phiSrcIdx = m_builder.CreatePHI(i32Ty, 2, "srcidx");
+        phiSrcIdx->addIncoming(numDigits, negBB);
+        phiSrcIdx->addIncoming(numDigits, posBB);
+        llvm::PHINode* phiRemaining = m_builder.CreatePHI(i32Ty, 2, "remaining");
+        phiRemaining->addIncoming(numDigits, negBB);
+        phiRemaining->addIncoming(numDigits, posBB);
+        llvm::Value* copyCond = m_builder.CreateICmpUGT(phiRemaining, zero, "copycond");
+        m_builder.CreateCondBr(copyCond, copyBodyBB, copyEndBB);
+
+        // copyBodyBB
+        m_builder.SetInsertPoint(copyBodyBB);
+        llvm::Value* srcIdx = m_builder.CreateSub(phiSrcIdx, one, "srcidxm1");
+        llvm::Value* srcCharPtr = m_builder.CreateGEP(i8Ty, tempPtr, srcIdx);
+        llvm::Value* srcChar = m_builder.CreateLoad(i8Ty, srcCharPtr, "srcchar");
+        m_builder.CreateStore(srcChar, phiDest);
+        llvm::Value* nextDest = m_builder.CreateGEP(i8Ty, phiDest, one, "nextdest");
+        llvm::Value* nextRemaining = m_builder.CreateSub(phiRemaining, one, "nextremaining");
+        phiDest->addIncoming(nextDest, copyBodyBB);
+        phiSrcIdx->addIncoming(srcIdx, copyBodyBB);
+        phiRemaining->addIncoming(nextRemaining, copyBodyBB);
+        m_builder.CreateBr(copyHeaderBB);
+
+        // copyEndBB
+        m_builder.SetInsertPoint(copyEndBB);
+        llvm::Value* extra = m_builder.CreateZExt(isNeg, i32Ty);
+        llvm::Value* finalLen = m_builder.CreateAdd(numDigits, extra, "finallen");
+        m_builder.CreateBr(returnBB);
+
+        // returnBB
+        m_builder.SetInsertPoint(returnBB);
+        llvm::PHINode* phiRetLen = m_builder.CreatePHI(i32Ty, 2, "retlen");
+        phiRetLen->addIncoming(one, zeroBB);
+        phiRetLen->addIncoming(finalLen, copyEndBB);
+        m_builder.CreateRet(phiRetLen);
+    }
+
+    void IRGenerator::createStringToInt()
+    {
+        llvm::Type* i32Ty = llvm::Type::getInt32Ty(m_context);
+        llvm::Type* i8Ty = llvm::Type::getInt8Ty(m_context);
+        llvm::Type* i8PtrTy = llvm::PointerType::getUnqual(m_context);
+        llvm::Type* i1Ty = llvm::Type::getInt1Ty(m_context);
+
+        // int __str_to_int(char* buf, int len)
+        llvm::FunctionType* funcType = llvm::FunctionType::get(i32Ty, {i8PtrTy, i32Ty}, false);
+        m_strToIntFunc = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, "__str_to_int", m_module);
+
+
+        llvm::BasicBlock* entryBB       = llvm::BasicBlock::Create(m_context, "entry", m_strToIntFunc);
+        llvm::BasicBlock* checkSignBB   = llvm::BasicBlock::Create(m_context, "checksign", m_strToIntFunc);
+        llvm::BasicBlock* positiveBB    = llvm::BasicBlock::Create(m_context, "positive", m_strToIntFunc);
+        llvm::BasicBlock* negativeBB    = llvm::BasicBlock::Create(m_context, "negative", m_strToIntFunc);
+        llvm::BasicBlock* negValidBB    = llvm::BasicBlock::Create(m_context, "negvalid", m_strToIntFunc);
+        llvm::BasicBlock* negInvalidBB  = llvm::BasicBlock::Create(m_context, "neginvalid", m_strToIntFunc);
+        llvm::BasicBlock* loopHeaderBB  = llvm::BasicBlock::Create(m_context, "loopheader", m_strToIntFunc);
+        llvm::BasicBlock* loopBodyBB    = llvm::BasicBlock::Create(m_context, "loopbody", m_strToIntFunc);
+        llvm::BasicBlock* loopEndBB     = llvm::BasicBlock::Create(m_context, "loopend", m_strToIntFunc);
+        llvm::BasicBlock* posEndBB      = llvm::BasicBlock::Create(m_context, "posend", m_strToIntFunc);
+        llvm::BasicBlock* negEndBB      = llvm::BasicBlock::Create(m_context, "negend", m_strToIntFunc);
+        llvm::BasicBlock* returnBB      = llvm::BasicBlock::Create(m_context, "return", m_strToIntFunc);
+
+        // entryBB
+        m_builder.SetInsertPoint(entryBB);
+        auto args = m_strToIntFunc->arg_begin();
+        llvm::Value* buf = args++;
+        llvm::Value* len = args++;
+
+        llvm::Value* zero = llvm::ConstantInt::get(i32Ty, 0);
+        llvm::Value* one = llvm::ConstantInt::get(i32Ty, 1);
+        llvm::Value* ten = llvm::ConstantInt::get(i32Ty, 10);
+        llvm::Value* charZero = llvm::ConstantInt::get(i8Ty, '0');
+        llvm::Value* charMinus = llvm::ConstantInt::get(i8Ty, '-');
+
+        llvm::Value* isEmpty = m_builder.CreateICmpEQ(len, zero, "isempty");
+        m_builder.CreateCondBr(isEmpty, returnBB, checkSignBB);
+
+        // checkSignBB
+        m_builder.SetInsertPoint(checkSignBB);
+        llvm::Value* firstCharPtr = m_builder.CreateGEP(i8Ty, buf, zero);
+        llvm::Value* firstChar = m_builder.CreateLoad(i8Ty, firstCharPtr, "firstchar");
+        llvm::Value* isMinus = m_builder.CreateICmpEQ(firstChar, charMinus, "isminus");
+        m_builder.CreateCondBr(isMinus, negativeBB, positiveBB);
+
+        // positiveB
+        m_builder.SetInsertPoint(positiveBB);
+        m_builder.CreateBr(loopHeaderBB);
+
+        // negativeBB
+        m_builder.SetInsertPoint(negativeBB);
+        llvm::Value* lenMinusOne = m_builder.CreateSub(len, one, "lenminusone");
+        llvm::Value* isValidNeg = m_builder.CreateICmpSGT(len, one, "isvalidneg");
+        m_builder.CreateCondBr(isValidNeg, negValidBB, negInvalidBB);
+
+        // negValidBB
+        m_builder.SetInsertPoint(negValidBB);
+        m_builder.CreateBr(loopHeaderBB);
+
+        // negInvalidBB 
+        m_builder.SetInsertPoint(negInvalidBB);
+        m_builder.CreateBr(returnBB);
+
+        // loopHeaderBB 
+        m_builder.SetInsertPoint(loopHeaderBB);
+
+        // phi node for index
+        llvm::PHINode* phiI = m_builder.CreatePHI(i32Ty, 2, "i");
+        phiI->addIncoming(zero, positiveBB);
+        phiI->addIncoming(one, negValidBB);
+
+        // phi for remaining
+        llvm::PHINode* phiRemaining = m_builder.CreatePHI(i32Ty, 2, "remaining");
+        phiRemaining->addIncoming(len, positiveBB);
+        phiRemaining->addIncoming(len, negValidBB);
+
+        // phi for result
+        llvm::PHINode* phiRes = m_builder.CreatePHI(i32Ty, 2, "res");
+        phiRes->addIncoming(zero, positiveBB);
+        phiRes->addIncoming(zero, negValidBB);
+
+        // phi for sign
+        llvm::PHINode* phiIsMinus = m_builder.CreatePHI(i1Ty, 2, "isminus");
+        phiIsMinus->addIncoming(llvm::ConstantInt::getFalse(m_context), positiveBB);
+        phiIsMinus->addIncoming(llvm::ConstantInt::getTrue(m_context), negValidBB);
+
+        llvm::Value* loopCond = m_builder.CreateICmpSLT(phiI, phiRemaining, "loopcond");
+        m_builder.CreateCondBr(loopCond, loopBodyBB, loopEndBB);
+
+        // loopBodyBB
+        m_builder.SetInsertPoint(loopBodyBB);
+        llvm::Value* charPtr = m_builder.CreateGEP(i8Ty, buf, phiI);
+        llvm::Value* ch = m_builder.CreateLoad(i8Ty, charPtr, "ch");
+        llvm::Value* digit = m_builder.CreateSub(m_builder.CreateZExt(ch, i32Ty),
+                                                m_builder.CreateZExt(charZero, i32Ty), "digit");
+        llvm::Value* newRes = m_builder.CreateAdd(m_builder.CreateMul(phiRes, ten), digit, "newres");
+        llvm::Value* nextI = m_builder.CreateAdd(phiI, one, "nexti");
+        phiI->addIncoming(nextI, loopBodyBB);
+        phiRes->addIncoming(newRes, loopBodyBB);
+        phiRemaining->addIncoming(phiRemaining, loopBodyBB);
+        phiIsMinus->addIncoming(phiIsMinus, loopBodyBB);
+        m_builder.CreateBr(loopHeaderBB);
+
+        // loopEndBB
+        m_builder.SetInsertPoint(loopEndBB);
+        llvm::Value* posResult = phiRes;
+        m_builder.CreateCondBr(phiIsMinus, negEndBB, posEndBB);
+
+        // posEndBB 
+        m_builder.SetInsertPoint(posEndBB);
+        m_builder.CreateBr(returnBB);
+
+        // negEndBB
+        m_builder.SetInsertPoint(negEndBB);
+        llvm::Value* negResult = m_builder.CreateNeg(posResult, "negresult");
+        m_builder.CreateBr(returnBB);
+
+        // returnBB
+        m_builder.SetInsertPoint(returnBB);
+        llvm::PHINode* phiRet = m_builder.CreatePHI(i32Ty, 4, "retval");
+        phiRet->addIncoming(zero, entryBB);       // empty
+        phiRet->addIncoming(zero, negInvalidBB);  // "-"
+        phiRet->addIncoming(posResult, posEndBB); // pos
+        phiRet->addIncoming(negResult, negEndBB); // neg
+        m_builder.CreateRet(phiRet);
+    }
+
+
+    void IRGenerator::createPrintInt()
+    {
+        llvm::Type* i32Ty = llvm::Type::getInt32Ty(m_context);
+        llvm::Type* i8Ty = llvm::Type::getInt8Ty(m_context);
+        llvm::Type* i8PtrTy = llvm::PointerType::getUnqual(m_context);
+
+        // void @printInt(i32 %val)
+        llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getVoidTy(m_context), {i32Ty}, false);
+        m_printIntFunc = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, "printInt", m_module);
+        auto* entry = llvm::BasicBlock::Create(m_context, "entry", m_printIntFunc);
+        m_builder.SetInsertPoint(entry);
+
+        auto args = m_printIntFunc->arg_begin();
+        llvm::Value* val = args++;
+
+        llvm::AllocaInst* buf = m_builder.CreateAlloca(llvm::ArrayType::get(i8Ty, 16), nullptr, "buf");
+        llvm::Value* bufPtr = m_builder.CreateBitCast(buf, i8PtrTy);
+
+        
+        llvm::Value* len = m_builder.CreateCall(m_intToStrFunc, {val, bufPtr}, "len");
+
+        // add '\n'
+        llvm::Value* newlinePtr = m_builder.CreateGEP(i8Ty, bufPtr, len);
+        m_builder.CreateStore(llvm::ConstantInt::get(i8Ty, '\n'), newlinePtr);
+        llvm::Value* lenWithNewline = m_builder.CreateAdd(len, llvm::ConstantInt::get(i32Ty, 1), "len_nl");
+
+        // syswrite to stdout
+        llvm::Value* fd = llvm::ConstantInt::get(i32Ty, 1);
+        m_builder.CreateCall(m_sysWriteFunc, {fd, bufPtr, lenWithNewline});
+
+        m_builder.CreateRetVoid();
+    }
+
+
+    void IRGenerator::createPrintBool()
+    {
+        llvm::Type* i32Ty = llvm::Type::getInt32Ty(m_context);
+        llvm::Type* i1Ty = llvm::Type::getInt1Ty(m_context);
+        llvm::Type* i8PtrTy = llvm::PointerType::getUnqual(m_context);
+
+        // void @printBool(i1 %val)
+        llvm::FunctionType* funcType = llvm::FunctionType::get(llvm::Type::getVoidTy(m_context), {i1Ty}, false);
+        m_printBoolFunc = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, "printBool", m_module);
+        auto* entry = llvm::BasicBlock::Create(m_context, "entry", m_printBoolFunc);
+        m_builder.SetInsertPoint(entry);
+
+        auto args = m_printBoolFunc->arg_begin();
+        llvm::Value* val = args++;
+
+
+        llvm::Constant* trueStr = llvm::ConstantDataArray::getString(m_context, "true\n");
+        llvm::Constant* falseStr = llvm::ConstantDataArray::getString(m_context, "false\n");
+
+        auto trueGlobal = new llvm::GlobalVariable(*m_module, trueStr->getType(), true,
+                                                llvm::GlobalValue::PrivateLinkage, trueStr, "str_true");
+        auto falseGlobal = new llvm::GlobalVariable(*m_module, falseStr->getType(), true,
+                                                    llvm::GlobalValue::PrivateLinkage, falseStr, "str_false");
+
+        llvm::Value* truePtr = llvm::ConstantExpr::getBitCast(trueGlobal, i8PtrTy);
+        llvm::Value* falsePtr = llvm::ConstantExpr::getBitCast(falseGlobal, i8PtrTy);
+
+        llvm::Value* strPtr = m_builder.CreateSelect(val, truePtr, falsePtr, "strptr");
+        llvm::Value* len = llvm::ConstantInt::get(i32Ty, 5);
+
+        llvm::Value* fd = llvm::ConstantInt::get(i32Ty, 1);
+        m_builder.CreateCall(m_sysWriteFunc, {fd, strPtr, len});
+
+        m_builder.CreateRetVoid();
+    }
+
+
+    void IRGenerator::createReadInt()
+    {
+        llvm::Type* i32Ty = llvm::Type::getInt32Ty(m_context);
+        llvm::Type* i8Ty = llvm::Type::getInt8Ty(m_context);
+        llvm::Type* i8PtrTy = llvm::PointerType::getUnqual(m_context);
+
+        // i32 @readInt()
+        llvm::FunctionType* funcType = llvm::FunctionType::get(i32Ty, {}, false);
+        m_readIntFunc = llvm::Function::Create(funcType, llvm::Function::InternalLinkage, "readInt", m_module);
+        auto* entry = llvm::BasicBlock::Create(m_context, "entry", m_readIntFunc);
+        m_builder.SetInsertPoint(entry);
+
+
+        llvm::AllocaInst* buf = m_builder.CreateAlloca(llvm::ArrayType::get(i8Ty, 32), nullptr, "buf");
+        llvm::Value* bufPtr = m_builder.CreateBitCast(buf, i8PtrTy);
+
+        // from stdin
+        llvm::Value* fd = llvm::ConstantInt::get(i32Ty, 0);
+        llvm::Value* maxLen = llvm::ConstantInt::get(i32Ty, 32);
+        llvm::Value* bytesRead = m_builder.CreateCall(m_sysReadFunc, {fd, bufPtr, maxLen}, "bytes_read");
+
+        llvm::Value* lenWithoutNewline = m_builder.CreateSub(bytesRead, llvm::ConstantInt::get(i32Ty, 1), "len");
+
+        llvm::Value* result = m_builder.CreateCall(m_strToIntFunc, {bufPtr, lenWithoutNewline}, "result");
+
+        m_builder.CreateRet(result);
+    }
+
+    // ================================================================================================================
+
+
+
+
+
+
+
+
 
     void IRGenerator::printModule()
     {
@@ -468,10 +888,57 @@ namespace minilang
             return;
         }
 
+        std::string calleeName = node.callee->toString();
+
+        // Встроенные функции
+        if (calleeName == "printInt")
+        {
+            if (node.arguments.size() != 1)
+            {
+                std::cerr << "printInt expects 1 argument" << std::endl;
+                pushValue(nullptr);
+                return;
+            }
+            node.arguments[0]->accept(*this);
+            llvm::Value* arg = popValue();
+            if (!arg) { pushValue(nullptr); return; }
+            m_builder.CreateCall(m_printIntFunc, {arg});
+            pushValue(llvm::ConstantInt::get(llvm::Type::getInt32Ty(m_context), 0));
+            return;
+        }
+        else if (calleeName == "printBool")
+        {
+            if (node.arguments.size() != 1)
+            {
+                std::cerr << "printBool expects 1 argument" << std::endl;
+                pushValue(nullptr);
+                return;
+            }
+            node.arguments[0]->accept(*this);
+            llvm::Value* arg = popValue();
+            if (!arg) { pushValue(nullptr); return; }
+            m_builder.CreateCall(m_printBoolFunc, {arg});
+            pushValue(llvm::ConstantInt::get(llvm::Type::getInt32Ty(m_context), 0));
+            return;
+        }
+        else if (calleeName == "readInt")
+        {
+            if (!node.arguments.empty())
+            {
+                std::cerr << "readInt expects no arguments" << std::endl;
+                pushValue(nullptr);
+                return;
+            }
+            llvm::Value* val = m_builder.CreateCall(m_readIntFunc, {}, "readval");
+            pushValue(val);
+            return;
+        }
+
+        // Обычный вызов пользовательской функции
         auto it = m_functionMap.find(node.symbol);
         if (it == m_functionMap.end())
         {
-            std::cerr << "Function not found: " << node.callee->toString() << std::endl;
+            std::cerr << "Function not found: " << calleeName << std::endl;
             pushValue(nullptr);
             return;
         }
@@ -490,7 +957,7 @@ namespace minilang
             args.push_back(argVal);
         }
 
-        llvm::Value* result = m_builder.CreateCall(callee, args, node.callee->toString() + "_call");
+        llvm::Value* result = m_builder.CreateCall(callee, args, calleeName + "_call");
         pushValue(result);
     }
 
@@ -523,5 +990,6 @@ namespace minilang
     {
 
     }
+
 
 } // namespace minilang

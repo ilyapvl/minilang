@@ -57,7 +57,24 @@ namespace minilang
         llvm::LLVMContext& m_context;
         llvm::Module* m_module;
         llvm::IRBuilder<> m_builder;
+
         llvm::Function* m_currentFunction;
+        llvm::Function* m_sysWriteFunc;
+        llvm::Function* m_sysReadFunc;
+
+        llvm::Function* m_intToStrFunc;
+        llvm::Function* m_strToIntFunc;
+        llvm::Function* m_printIntFunc;
+        llvm::Function* m_printBoolFunc;
+        llvm::Function* m_readIntFunc;
+
+        void declareSysWrappers();
+        void createIntToString();
+        void createStringToInt();
+        void createPrintInt();
+        void createPrintBool();
+        void createReadInt();
+
         llvm::BasicBlock* m_currentEntryBlock;
         std::unordered_map<SymbolEntry*, llvm::Function*> m_functionMap;
         std::unordered_map<SymbolEntry*, llvm::AllocaInst*> m_allocaMap;
