@@ -1,23 +1,24 @@
-int a = 10;
-
-while (a >= 100)
+@math
 {
-    int b = a - 17;
-
-    if (a % b == 0)
+    @ops
     {
-        a = 0;
-        break;
+        func sum(int a, int b) -> int
+        {
+            return a + b;
+        }
+    }
+
+    func fibonacci(int x) -> int
+    {
+        if (x == 1 || x == 2) return x;
+        return ops::sum(fibonacci(x - 1), fibonacci(x - 2));
     }
 }
 
+func main() -> int
+{
+    int x = readInt();
+    printBool(math::fibonacci(x) == 89);
 
-
-
-
-
-
-
-
-
-
+    return 0; 
+}

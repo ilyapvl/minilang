@@ -4,6 +4,29 @@
 namespace minilang
 {
 
+    SemanticAnalyzer::SemanticAnalyzer()
+        : m_currentTable(&m_globalTable), m_hasError(false)
+    {
+        Position builtinPos(0, 0);
+
+        SymbolEntry* printIntEntry = m_globalTable.declareFunction("printInt", Type::INT, builtinPos);
+        if (printIntEntry)
+        {
+            printIntEntry->paramTypes = {Type::INT};
+        }
+
+        SymbolEntry* printBoolEntry = m_globalTable.declareFunction("printBool", Type::INT, builtinPos);
+        if (printBoolEntry)
+        {
+            printBoolEntry->paramTypes = {Type::BOOL};
+        }
+
+        SymbolEntry* readIntEntry = m_globalTable.declareFunction("readInt", Type::INT, builtinPos);
+        if (readIntEntry)
+        {
+            readIntEntry->paramTypes = {};
+        }
+    }
 
 
     bool SemanticAnalyzer::analyze(Program* root)
@@ -269,11 +292,6 @@ namespace minilang
     {
         node.exprType = (node.value ? Type::BOOL : Type::BOOL);
     }
-
-
-    SemanticAnalyzer::SemanticAnalyzer()
-        : m_currentTable(&m_globalTable), m_hasError(false) {}
-
 
     void SemanticAnalyzer::visit(NamespaceDecl& node)
     {

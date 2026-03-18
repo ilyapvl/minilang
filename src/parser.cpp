@@ -643,8 +643,8 @@ namespace minilang
 
             if (act_it == state_it->second.end())
             {
-                reportError("Unexpected token: " + m_previousToken.lexeme);
-                if (!recover()) return nullptr;
+                reportError("Unexpected token: " + m_currentToken.lexeme);
+                return nullptr; //TODO - recover()
             }
             m_previousToken = m_currentToken;
 
