@@ -280,7 +280,7 @@ namespace grammar
         void printStates() const;
 
     private:
-        bool resolveShiftReduce(int state, Symbol term, int reduceProd);
+        int resolveShiftReduce(int state, Symbol term, int reduceProd);
     };
 
 } // namespace minilang
