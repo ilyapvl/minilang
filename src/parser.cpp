@@ -244,17 +244,16 @@ namespace minilang
 
             case PROD_BLOCK:
             {
-                auto declList = cast_node<DeclList>(children[1]);
-                auto stmtList = cast_node<StmtList>(children[2]);
-                if (!declList || !stmtList) return nullptr;
+                auto dosList = cast_node<DeclOrStmtList>(children[1]);
+                if (!dosList) return nullptr;
+                
+                Position pos = dosList->pos;
 
-                Position pos = getFirstPos();
-                auto block = std::make_unique<Block>(
-                    std::move(declList->declarations),
-                    std::move(stmtList->statements),
+                return std::make_unique<Block>(
+                    std::move(dosList->declarations),
+                    std::move(dosList->statements),
                     pos
                 );
-                return block;
             }
 
             case PROD_DECLLIST_EMPTY:

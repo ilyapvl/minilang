@@ -65,7 +65,7 @@ namespace grammar
         addProduction(PROD_IFSTMT2, NONTERM_IFSTMT, {TERM_IF, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT, TERM_ELSE, NONTERM_STATEMENT});
         addProduction(PROD_WHILESTMT, NONTERM_WHILESTMT, {TERM_WHILE, TERM_LPAREN, NONTERM_EXPRESSION, TERM_RPAREN, NONTERM_STATEMENT});
         
-        addProduction(PROD_BLOCK, NONTERM_BLOCK, {TERM_LBRACE, NONTERM_DECLLIST, NONTERM_STMTLIST, TERM_RBRACE});
+        addProduction(PROD_BLOCK, NONTERM_BLOCK, {TERM_LBRACE, NONTERM_DECLORSTMTLIST, TERM_RBRACE});
         addProduction(PROD_DECLLIST_EMPTY, NONTERM_DECLLIST, {});
         addProduction(PROD_DECLLIST_REC, NONTERM_DECLLIST, {NONTERM_DECLLIST, NONTERM_DECLARATION});
         addProduction(PROD_STMTLIST_EMPTY, NONTERM_STMTLIST, {});
@@ -674,7 +674,7 @@ namespace grammar
         }
     }
 
-    bool Grammar::resolveShiftReduce(int state, Symbol term, int reduceProd) // returns true for reduce, false for shift
+    int Grammar::resolveShiftReduce(int state, Symbol term, int reduceProd)
     {
         int term_prec = term_precedence.count(term) ? term_precedence.at(term) : 0;
         int term_ass = term_assoc.count(term) ? term_assoc.at(term) : 0;
@@ -683,12 +683,12 @@ namespace grammar
 
         if (prod_prec == 0)
         {
-            return false;
+            return Action::SHIFT;
         }
 
         if (term_prec > prod_prec)
         {
-            return false;
+            return Action::SHIFT;
         }
 
         else if (term_prec < prod_prec)
@@ -697,7 +697,7 @@ namespace grammar
             act.kind = Action::REDUCE;
             act.value = reduceProd;
             action_table[state][term] = act;
-            return true;
+            return Action::REDUCE;
         }
         
         else
@@ -708,16 +708,16 @@ namespace grammar
                 act.kind = Action::REDUCE;
                 act.value = reduceProd;
                 action_table[state][term] = act;
-                return true;
+                return Action::REDUCE;
             }
             else if (term_ass == 2)
             {
-                return false;
+                return Action::SHIFT;
             }
             else
             {
                 action_table[state].erase(term);
-                return true;
+                return Action::SHIFT;
             }
         }
     }
