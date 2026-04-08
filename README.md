@@ -19,7 +19,7 @@ Minilang is a simple programming language that supports functions with parameter
 - LLVM 15+
 - Google Test for running tests
 
-## Сборка
+## How to build
 
 1. Clone the repository:
 
@@ -143,7 +143,7 @@ printBool(x > 0);
         line */
 ```
 
-## Структура проекта
+## Project structure
 
 - `ast.hpp`, `ast.cpp` — abstract syntax tree classes
 - `grammar.hpp`, `grammar.cpp` — grammar and building of LR(1)/LALR tables
