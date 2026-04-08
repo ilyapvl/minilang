@@ -78,9 +78,12 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    //generator.printModule();
+    generator.printModule();
 
     optimizeModule(generator.getModule());
+
+    
+    std::cout << "\n\n\n── Optimized ──────────────────────────────────────────────────────────────────\n\n\n";
 
     generator.printModule();
 

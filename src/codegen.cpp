@@ -14,6 +14,13 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Transforms/Scalar/ConstantHoisting.h"
+#include "llvm/Transforms/Scalar/GVN.h"
+#include "llvm/Transforms/Scalar/SimplifyCFG.h"
+#include "llvm/Transforms/Utils/Mem2Reg.h"
+#include "llvm/Transforms/InstCombine/InstCombine.h"
+#include "llvm/Transforms/Scalar/Sink.h"
+
 #include <iostream>
 
 namespace minilang
@@ -21,18 +28,30 @@ namespace minilang
 
     void optimizeModule(llvm::Module* Mod)
     {
-        llvm::legacy::PassManager passManager;
+        llvm::LoopAnalysisManager LAM;
+        llvm::FunctionAnalysisManager FAM;
+        llvm::CGSCCAnalysisManager CGAM;
+        llvm::ModuleAnalysisManager MAM;
 
-        //passManager.add(llvm::createConstantHoistingPass());
-        passManager.add(llvm::createGVNPass());
-        passManager.add(llvm::createCFGSimplificationPass());
-        //passManager.add(llvm::createPromoteMemoryToRegisterPass());
-        //passManager.add(llvm::createInstructionCombiningPass());
+        llvm::PassBuilder PB;
+        PB.registerLoopAnalyses(LAM);
+        PB.registerFunctionAnalyses(FAM);
+        PB.registerCGSCCAnalyses(CGAM);
+        PB.registerModuleAnalyses(MAM);
+        PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-        //passManager.add(llvm::createSinkingPass());
-        
+        llvm::FunctionPassManager FPM;
+        //FPM.addPass(llvm::ConstantHoistingPass());
+        FPM.addPass(llvm::GVNPass());
+        FPM.addPass(llvm::SimplifyCFGPass());
+        //FPM.addPass(llvm::PromotePass());
+        //FPM.addPass(llvm::InstCombinePass());
+        //FPM.addPass(llvm::SinkingPass());
 
-        passManager.run(*Mod);
+        llvm::ModulePassManager MPM;
+        MPM.addPass(llvm::createModuleToFunctionPassAdaptor(std::move(FPM)));
+
+        MPM.run(*Mod, MAM);
     }
 
     bool generateARMCode(llvm::Module* Mod, const std::string& outputFilename)
